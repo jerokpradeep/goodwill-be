@@ -1,0 +1,793 @@
+package in.codifi.funds.service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+
+import org.jboss.resteasy.reactive.RestResponse;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+
+import com.razorpay.Order;
+
+import in.codifi.cache.model.Bankdetails;
+import in.codifi.cache.model.ClientDetailsModel;
+import in.codifi.cache.model.ClinetInfoModel;
+import in.codifi.funds.config.HazelcastConfig;
+import in.codifi.funds.entity.primary.BOPaymentLogEntity;
+import in.codifi.funds.entity.primary.PaymentRefEntity;
+import in.codifi.funds.entity.primary.UpiDetailsEntity;
+import in.codifi.funds.helper.PaymentHelper;
+import in.codifi.funds.model.request.PaymentReqModel;
+import in.codifi.funds.model.request.UPIReqModel;
+import in.codifi.funds.model.request.VerifyPaymentReqModel;
+import in.codifi.funds.model.response.BankDetails;
+import in.codifi.funds.model.response.GenericResponse;
+import in.codifi.funds.model.response.GetPaymentResposeModel;
+import in.codifi.funds.model.response.PaymentResponseModel;
+import in.codifi.funds.model.response.RazorpayModel;
+import in.codifi.funds.repository.BOPaymentLogRepository;
+import in.codifi.funds.repository.BankDetailsEntityManager;
+import in.codifi.funds.repository.DropdownRepository;
+import in.codifi.funds.repository.PaymentRefRepository;
+import in.codifi.funds.repository.UpiRepository;
+import in.codifi.funds.service.spec.PaymentServiceSpec;
+import in.codifi.funds.utility.AppConstants;
+import in.codifi.funds.utility.CodifiUtil;
+import in.codifi.funds.utility.EmailUtils;
+import in.codifi.funds.utility.PrepareResponse;
+import in.codifi.funds.utility.StringUtil;
+import in.codifi.funds.ws.service.BackOfficeRestService;
+import in.codifi.funds.ws.service.RazorpayRestService;
+import io.quarkus.logging.Log;
+
+@ApplicationScoped
+public class PaymentService implements PaymentServiceSpec {
+	@Inject
+	PrepareResponse prepareResponse;
+	@Inject
+	BankDetailsEntityManager bankDetailsEntityManager;
+	@Inject
+	EmailUtils emailUtils;
+	@Inject
+	PaymentHelper paymentHelper;
+	@Inject
+	PaymentRefRepository paymentRefRepo;
+	@Inject
+	BackOfficeRestService backOfficeRestService;
+	@Inject
+	UpiRepository accRepo;
+	@Inject
+	RazorpayRestService razorpayRestService;
+	@Inject
+	CodifiUtil commonMethods;
+	@Inject
+	BOPaymentLogRepository boPaymentRepo;
+	@Inject
+	DropdownRepository dropdownRepository;
+
+	/**
+	 * method to create new payment details
+	 * 
+	 * @author SOWMIYA
+	 * @param paymentReqModel
+	 * @param clientInfo
+	 */
+	@Override
+	public RestResponse<GenericResponse> createNewPayment(PaymentReqModel paymentReqModel, ClinetInfoModel info) {
+		try {
+			if (!validateNewPaymentReq(paymentReqModel))
+				return prepareResponse.prepareFailedResponse(AppConstants.INVALID_PARAMETER);
+			String ifsc = paymentReqModel.getIfscCode();
+			String accNo = paymentReqModel.getBankActNo().replace("*", "");
+			BankDetails bankDetails = bankDetailsEntityManager.getBankDetailsByBankNo(ifsc, accNo, info.getUserId());
+			if (bankDetails == null) {
+				bankDetails = getBankDetailsFromBo(info.getUserId(), ifsc, accNo);
+			}
+
+			if (bankDetails != null) {
+				paymentReqModel.setBankActNo(bankDetails.getBankActNo());
+				paymentReqModel.setClientName(bankDetails.getClientName());
+				paymentReqModel.setIfscCode(bankDetails.getIfscCode());
+				String receipt = commonMethods.randomAlphaNumeric(15);
+				paymentReqModel.setReceipt(receipt);
+				if (StringUtil.isNullOrEmpty(receipt))
+					return prepareResponse.prepareFailedResponse(AppConstants.PAYMENT_FAILED_ID_NULL);
+				if (paymentReqModel.getAmount() <= 0)
+					return prepareResponse.prepareFailedResponse(AppConstants.AMOUNT_ZERO);
+				RazorpayModel rzpayModel = paymentHelper.createPayment(paymentReqModel, info);
+				if (rzpayModel.getStat() == 0)
+					return prepareResponse.prepareFailedResponse(AppConstants.PAYMENT_CREATION_FAILED);
+				Order order = rzpayModel.getOrder();
+				if (order == null)
+					return prepareResponse.prepareFailedResponse(AppConstants.PAYMENT_CREATION_FAILED);
+				String orderId = order.get("id");
+				paymentReqModel.setOrderId(orderId);
+				paymentReqModel.setUserId(info.getUserId());
+
+				PaymentRefEntity paymentRefEntity = preparePaymentDetails(paymentReqModel, order.toString());
+				PaymentRefEntity savedData = paymentRefRepo.save(paymentRefEntity);
+				if (savedData != null) {
+					PaymentResponseModel response = new PaymentResponseModel();
+					response.setOrderId(orderId);
+					response.setReceiptId(receipt);
+					return prepareResponse.prepareSuccessResponseObject(response);
+				} else {
+					return prepareResponse.prepareFailedResponse(AppConstants.INTERNAL_ERROR);
+				}
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+	}
+
+	/**
+	 * method to get bank details from back office
+	 * 
+	 * @author SOWMIYA
+	 * @param userId,ifsc,accno
+	 *
+	 */
+	private BankDetails getBankDetailsFromBo(String userId, String ifsc, String accNo) {
+		BankDetails bankDetails = new BankDetails();
+		try {
+			Object boBankDetails = backOfficeRestService.loginBackOffice(userId, 0);
+			if (boBankDetails != null) {
+				JSONArray arrResponse = (JSONArray) boBankDetails;
+				if (arrResponse != null && arrResponse.size() > 0) {
+					JSONObject results = (JSONObject) arrResponse.get(0);
+					JSONArray data = (JSONArray) results.get("DATA");
+					for (int i = 0; i < data.size(); i++) {
+						JSONArray dataObj = new JSONArray();
+						dataObj = (JSONArray) data.get(i);
+						if (dataObj != null && dataObj.size() > 0) {
+							String ifscCode = (String) dataObj.get(3);
+							String bankName = (String) dataObj.get(11);
+							String bankAccNo = (String) dataObj.get(8);
+							String clientName = (String) dataObj.get(7);
+							if (ifscCode.equalsIgnoreCase(ifsc) && bankAccNo.endsWith(accNo)) {
+								bankDetails.setIfscCode(ifscCode);
+								bankDetails.setBankName(bankName);
+								bankDetails.setBankActNo(bankAccNo);
+								bankDetails.setClientName(clientName);
+							}
+						}
+					}
+				}
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			Log.error(e.getMessage());
+		}
+		return bankDetails;
+	}
+
+	/**
+	 * method to prepare payment details
+	 * 
+	 * @author SOWMIYA
+	 * @param paymentReqModel
+	 * @param req
+	 */
+	private PaymentRefEntity preparePaymentDetails(PaymentReqModel paymentReqModel, String req) {
+		PaymentRefEntity refEntity = new PaymentRefEntity();
+		try {
+			refEntity.setAccNum(paymentReqModel.getBankActNo());
+			refEntity.setBankName(paymentReqModel.getBankName());
+			refEntity.setExchSeg(paymentReqModel.getSegment());
+			refEntity.setUserId(paymentReqModel.getUserId());
+			refEntity.setOrderId(paymentReqModel.getOrderId());
+			refEntity.setPaymentMethod(paymentReqModel.getPayMethod());
+			refEntity.setReceiptId(paymentReqModel.getReceipt());
+			refEntity.setRequest(req);
+			refEntity.setAmount(paymentReqModel.getAmount());
+			refEntity.setUpiId(paymentReqModel.getUpiId());
+			refEntity.setPaymentStatus("created");
+			refEntity.setCreatedBy(paymentReqModel.getUserId());
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return refEntity;
+
+	}
+
+	/**
+	 * method to validate parameters
+	 * 
+	 * @author SOWMIYA
+	 * @param paymentReqModel
+	 *
+	 */
+	private boolean validateNewPaymentReq(PaymentReqModel paymentReqModel) {
+		if (StringUtil.isNotNullOrEmpty(paymentReqModel.getBankActNo()) && paymentReqModel.getAmount() > 0
+				&& StringUtil.isNotNullOrEmpty(paymentReqModel.getSegment())
+				&& StringUtil.isNotNullOrEmpty(paymentReqModel.getPayMethod())
+				&& StringUtil.isNotNullOrEmpty(paymentReqModel.getDevice())
+				&& StringUtil.isNotNullOrEmpty(paymentReqModel.getIfscCode())) {
+			return true;
+
+		}
+
+		return false;
+	}
+
+	/*
+	 * method to get upi id
+	 * 
+	 * @author SOWMIYA
+	 * 
+	 * @return
+	 */
+
+	@Override
+	public RestResponse<GenericResponse> getUPIId(ClinetInfoModel info) {
+		try {
+			UpiDetailsEntity accRes = accRepo.findByUserId(info.getUserId());
+			if (accRes != null) {
+				return prepareResponse.prepareSuccessResponseObject(accRes);
+			} else {
+				return prepareResponse.prepareSuccessMessage(AppConstants.NO_DATA);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+	}
+
+	/*
+	 * method to set upi id
+	 * 
+	 * @author SOWMIYA
+	 * 
+	 * @return
+	 */
+	@Override
+	public RestResponse<GenericResponse> setUPIId(ClinetInfoModel info, UPIReqModel model) {
+		UpiDetailsEntity upiDetailsEntity = new UpiDetailsEntity();
+		try {
+			if (StringUtil.isNullOrEmpty(model.getUpiId()))
+				return prepareResponse.prepareFailedResponse(AppConstants.INVALID_PARAMETER);
+			upiDetailsEntity = accRepo.findByUserId(info.getUserId());
+			if (upiDetailsEntity != null) {
+				upiDetailsEntity.setUpiId(model.getUpiId());
+				upiDetailsEntity.setUpdatedBy(info.getUserId());
+			} else {
+				upiDetailsEntity = new UpiDetailsEntity();
+				upiDetailsEntity.setUserId(info.getUserId());
+				upiDetailsEntity.setUpiId(model.getUpiId());
+				upiDetailsEntity.setCreatedBy(info.getUserId());
+			}
+			if (upiDetailsEntity != null) {
+				UpiDetailsEntity update = accRepo.save(upiDetailsEntity);
+				if (update != null)
+					if (HazelcastConfig.getInstance().getPaymentDetails().containsKey(info.getUserId())) {
+						GetPaymentResposeModel paymentResponseModel = HazelcastConfig.getInstance().getPaymentDetails()
+								.get(info.getUserId());
+						paymentResponseModel.setUpiId(update.getUpiId());
+						HazelcastConfig.getInstance().getPaymentDetails().remove(info.getUserId());
+						HazelcastConfig.getInstance().getPaymentDetails().put(info.getUserId(), paymentResponseModel);
+						return prepareResponse.prepareSuccessResponseObject(paymentResponseModel);
+					}
+				return prepareResponse.prepareSuccessResponseObject(update);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			Log.error(e.getMessage());
+		}
+		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+
+	}
+
+	/*
+	 * method to get payment details
+	 * 
+	 * @author SOWMIYA
+	 * 
+	 * @return
+	 */
+	@Override
+	public RestResponse<GenericResponse> getPaymentDetails(ClinetInfoModel info) {
+		GetPaymentResposeModel paymentResponseModel = new GetPaymentResposeModel();
+		try {
+			if (HazelcastConfig.getInstance().getClientDetails().get(info.getUserId()) != null) {
+				ClientDetailsModel clientModel = HazelcastConfig.getInstance().getClientDetails().get(info.getUserId());
+
+				paymentResponseModel.setPhone(clientModel.getMobNo());
+				paymentResponseModel.setEmail(clientModel.getEmail());
+				paymentResponseModel.setSegEnable(clientModel.getExchange());
+				paymentResponseModel.setUserName(clientModel.getClientName());
+				UpiDetailsEntity accRes = accRepo.findByUserId(info.getUserId());
+				if (accRes != null) {
+					paymentResponseModel.setUpiId(accRes.getUpiId());
+				} else {
+					paymentResponseModel.setUpiId("NA");
+				}
+				List<BankDetails> bankDetails = bankDetailsEntityManager.getUserBankDetailsFromDB(info);
+				if (bankDetails == null || StringUtil.isListNullOrEmpty(bankDetails) || bankDetails.size() <= 0) {
+					BankDetails bDetails = new BankDetails();
+					bDetails.setBankCode(clientModel.getBranchId());
+					Bankdetails details = clientModel.getBankdetails().get(0);
+					bDetails.setBankName(details.getBankName());
+					bDetails.setBankActNo(details.getAccNumber());
+					bDetails.setClientName(clientModel.getClientName());
+					bankDetails.add(bDetails);
+				}
+				paymentResponseModel.setBankDetails(bankDetails);
+				List<String> payoutReasons = dropdownRepository.getPayoutReasons();
+				if (StringUtil.isListNotNullOrEmpty(payoutReasons)) {
+					paymentResponseModel.setPayoutReasons(payoutReasons);
+				}
+				HazelcastConfig.getInstance().getPaymentDetails().put(info.getUserId(), paymentResponseModel);
+				return prepareResponse.prepareSuccessResponseObject(paymentResponseModel);
+
+			} else {
+				Log.error("Client Info is Empty");
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+	}
+
+	/**
+	 * method to verify payments
+	 * 
+	 * @author SOWMIYA
+	 * @param info
+	 * @param model
+	 * @return
+	 */
+	@Override
+	public RestResponse<GenericResponse> verifyPayments(ClinetInfoModel info, VerifyPaymentReqModel model) {
+		try {
+			if (!validatePaymentParameter(model))
+				return prepareResponse.prepareFailedResponse(AppConstants.INVALID_PARAMETER);
+			boolean isEqual = paymentHelper.verifyPayment(model, info.getUserId());
+			if (isEqual) {
+				updateBoPayment(model.getRazorpayOrderId(), model.getRazorpayPaymentId());
+				paymentRefRepo.updatePaymentDetails(info.getUserId(), model.getRazorpayOrderId(), "Sucessfull");
+				return prepareResponse.prepareSuccessResponseObject(AppConstants.VERIFY_SUCCEED);
+			} else {
+				paymentRefRepo.updatePaymentDetails(info.getUserId(), model.getRazorpayOrderId(), "Failed");
+				return prepareResponse.prepareFailedResponse(AppConstants.VERIFY_NOT_SUCCEED);
+			}
+
+		} catch (Exception e) {
+			Log.error(e.getMessage());
+			e.printStackTrace();
+		}
+		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+
+	}
+
+	/**
+	 * method to validate payment parameters
+	 * 
+	 * @author SOWMIYA
+	 * @param info
+	 * @param model
+	 * @return
+	 */
+	private boolean validatePaymentParameter(VerifyPaymentReqModel model) {
+		if (model.getAmount() > 0 && StringUtil.isNotNullOrEmpty(model.getCurrency())
+				&& StringUtil.isNotNullOrEmpty(model.getReceipt())
+				&& StringUtil.isNotNullOrEmpty(model.getRazorpayOrderId())
+				&& StringUtil.isNotNullOrEmpty(model.getRazorpayPaymentId())
+				&& StringUtil.isNotNullOrEmpty(model.getRazorpaySignature())) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * method to update back office payment
+	 * 
+	 * @author SOWMIYA
+	 * @param orderId
+	 * @param paymentId
+	 */
+	private void updateBoPayment(String orderId, String paymentId) {
+		ExecutorService pool = Executors.newSingleThreadExecutor();
+		PaymentRefEntity paymentDetailsDB = paymentRefRepo.findByOrderId(orderId);
+		pool.execute(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					// Get order details from the Database for given order id
+
+//					PaymentRefEntity paymentDetailsDB = paymentRefRepo.findByOrderId(orderId);
+//					Log.info("First Resp " + paymentDetailsDB.getOrderId());
+
+					Log.info("second Resp " + paymentDetailsDB.getOrderId());
+					if (paymentDetailsDB != null) {
+						// Check Bo is already pushed or not
+						String voucherId = paymentDetailsDB.getVoucherNo();
+						if (paymentDetailsDB.getBoUpdate() == 0 && StringUtil.isNullOrEmpty(voucherId)) {
+							// Call to BO For Updating the Payin
+							JSONArray boPayInResponse = (JSONArray) backOfficeRestService.loginBackOfficePayIn(
+									paymentDetailsDB.getUserId(), paymentDetailsDB.getExchSeg(), orderId,
+									paymentDetailsDB.getAmount(), paymentDetailsDB.getAccNum(), paymentId,
+									paymentDetailsDB.getPaymentMethod(), 0);
+							if (boPayInResponse != null && boPayInResponse.size() > 0) {
+								JSONObject boPayResponseJson = (JSONObject) boPayInResponse.get(0);
+								if (boPayResponseJson != null) {
+									JSONArray boPayInData = (JSONArray) boPayResponseJson.get("DATA");
+									if (boPayInData != null && boPayInData.size() > 0) {
+										JSONArray boPayInData2 = (JSONArray) boPayInData.get(0);
+										if (boPayInData2 != null && boPayInData2.size() > 0) {
+											String originalData = (String) boPayInData2.get(0);
+											if (StringUtil.isNotNullOrEmpty(originalData)) {
+												String paymentStatus = "Sucessfull";
+												String[] data = originalData.split(",");
+												String status = data[0];
+												String voucherNo = data[1];
+												if (status.equalsIgnoreCase("Sucess:1")
+														&& StringUtil.isNotNullOrEmpty(voucherNo)) {
+													paymentRefRepo.updateboStatus(orderId, voucherNo, paymentStatus,
+															paymentDetailsDB.getUserId());
+												}
+											} else {
+												// Send payment Failure Mail to Admin's
+												String message = " Payment of user " + paymentDetailsDB.getUserId()
+														+ " with bank account no : " + paymentDetailsDB.getAccNum()
+														+ " with amount " + paymentDetailsDB.getAmount()
+														+ " is Failed with razorpay Id : " + paymentId;
+												emailUtils.paymentFailureEmail(message);
+											}
+										} else {
+											// Send payment Failure Mail to Admin's
+											String message = " Payment of user " + paymentDetailsDB.getUserId()
+													+ " with bank account no : " + paymentDetailsDB.getAccNum()
+													+ " with amount " + paymentDetailsDB.getAmount()
+													+ " is Failed with razorpay Id : " + paymentId;
+											emailUtils.paymentFailureEmail(message);
+										}
+									} else {
+										// Send payment Failure Mail to Admin's
+										String message = " Payment of user " + paymentDetailsDB.getUserId()
+												+ " with bank account no : " + paymentDetailsDB.getAccNum()
+												+ " with amount " + paymentDetailsDB.getAmount()
+												+ " is Failed with razorpay Id : " + paymentId;
+										emailUtils.paymentFailureEmail(message);
+									}
+								} else {
+									// Send payment Failure Mail to Admin's
+									String message = " Payment of user " + paymentDetailsDB.getUserId()
+											+ " with bank account no : " + paymentDetailsDB.getAccNum()
+											+ " with amount " + paymentDetailsDB.getAmount()
+											+ " is Failed with razorpay Id : " + paymentId;
+									emailUtils.paymentFailureEmail(message);
+								}
+							} else {
+								// Send payment Failure Mail to Admin's
+								String message = " Payment of user " + paymentDetailsDB.getUserId()
+										+ " with bank account no : " + paymentDetailsDB.getAccNum() + " with amount "
+										+ paymentDetailsDB.getAmount() + " is Failed with razorpay Id : " + paymentId;
+								emailUtils.paymentFailureEmail(message);
+							}
+						}
+					}
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+		});
+		pool.shutdown();
+
+	}
+
+	/*
+	 * method to get the payout check balance
+	 * 
+	 * @author SOWMIYA
+	 * 
+	 * @return
+	 */
+	@Override
+	public RestResponse<GenericResponse> payOutCheckBalance(ClinetInfoModel info) {
+		try {
+			JSONArray checkBalanceResponse = (JSONArray) backOfficeRestService
+					.loginBackOfficeCheckBalance(info.getUserId(), 0);
+			if (checkBalanceResponse != null) {
+				return prepareResponse.prepareSuccessResponseObject(checkBalanceResponse);
+			} else {
+				return prepareResponse.prepareFailedResponse(AppConstants.CANNOT_GET_BANK_DETAILS);
+			}
+		} catch (Exception e) {
+			Log.error(e.getMessage());
+			e.printStackTrace();
+		}
+		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+	}
+
+	/*
+	 * method to get pay out details
+	 * 
+	 * @author SOWMIYA
+	 * 
+	 * @return
+	 */
+	@Override
+	public RestResponse<GenericResponse> getPayOutDetails(ClinetInfoModel info) {
+		try {
+
+//			List<BOPaymentLogEntity> paymentLogEntity = boPaymentRepo.findByUserIdWithLimit(info.getUserId(), 5);
+			Pageable pageable = PageRequest.of(0, 5);
+			List<BOPaymentLogEntity> paymentLogEntity = boPaymentRepo
+					.findAllByUserIdOrderByCreatedOnDesc(info.getUserId(), pageable);
+			if (paymentLogEntity != null && paymentLogEntity.size() > 0) {
+				paymentLogEntity = preparePaymentResponse(paymentLogEntity);
+				return prepareResponse.prepareSuccessResponseObject(paymentLogEntity);
+			} else {
+				return prepareResponse.prepareSuccessMessage(AppConstants.NO_DATA);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+	}
+
+	/*
+	 * method to prepare BO Payment details
+	 * 
+	 * @author SOWMIYA
+	 * 
+	 * @return
+	 */
+	private List<BOPaymentLogEntity> preparePaymentResponse(List<BOPaymentLogEntity> paymentLogEntity) {
+		List<BOPaymentLogEntity> boPayment = new ArrayList<>();
+		try {
+			for (BOPaymentLogEntity logEntity : paymentLogEntity) {
+				String bankActNo = logEntity.getBankActNo();
+				if (StringUtil.isNotNullOrEmpty(logEntity.getBankActNo())) {
+					bankActNo = bankActNo.replaceAll(".(?=.{4})", "*");
+				}
+				if (StringUtil.isNullOrEmpty(logEntity.getPayoutReason())) {
+					logEntity.setPayoutReason("NA");
+				}
+				logEntity.setBankActNo(bankActNo);
+				boPayment.add(logEntity);
+
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			Log.error(e.getMessage());
+		}
+		return boPayment;
+	}
+
+	/*
+	 * method to pay out
+	 * 
+	 * @author SOWMIYA
+	 * 
+	 * @return
+	 */
+	@Override
+	public RestResponse<GenericResponse> payOut(ClinetInfoModel info, PaymentReqModel model) {
+		try {
+			/** Validate Request **/
+			if (!validatePayoutParams(model))
+				return prepareResponse.prepareFailedResponse(AppConstants.INVALID_PARAMETER);
+
+			/** create pay out details **/
+			createPayOut(info.getUserId(), model);
+			return prepareResponse.prepareSuccessResponseObject(AppConstants.SUCCESS_STATUS);
+
+		} catch (Exception e) {
+
+			Log.error(e.getMessage());
+			e.printStackTrace();
+		}
+		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+
+	}
+
+	/*
+	 * method to validate Payout params parameter
+	 * 
+	 * @author SOWMIYA
+	 * 
+	 * @return
+	 */
+	private boolean validatePayoutParams(PaymentReqModel model) {
+		if (StringUtil.isNotNullOrEmpty(model.getBankActNo()) && StringUtil.isNotNullOrEmpty(model.getIfscCode())
+				&& StringUtil.isNotNullOrEmpty(model.getSegment()) && model.getAmount() > 0) {
+			return true;
+		}
+		return false;
+	}
+
+	/*
+	 * Method to create pay out details
+	 * 
+	 * @author SOWMIYA
+	 * 
+	 * @return
+	 */
+	private void createPayOut(String userId, PaymentReqModel model) {
+
+		ExecutorService pool = Executors.newSingleThreadExecutor();
+		pool.execute(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					// Check the given Amount is lesser than Due Amount
+					JSONArray checkBalanceResponse = (JSONArray) backOfficeRestService
+							.loginBackOfficeCheckBalance(userId, 0);
+					if (checkBalanceResponse != null) {
+						JSONObject tempJson = (JSONObject) checkBalanceResponse.get(0);
+						if (tempJson != null) {
+							JSONArray tempData = (JSONArray) tempJson.get("DATA");
+							if (tempData != null && tempData.size() > 0) {
+								JSONArray data = (JSONArray) tempData.get(0);
+								if (data != null && data.size() > 0) {
+//							Double balance = (Double) data.get(data.size() - 2);
+									String balance = data.get(data.size() - 1).toString();
+									Double dueAmount = Double.parseDouble(balance);
+									if (model.getAmount() <= dueAmount) {
+										JSONArray boPayOutResponse = (JSONArray) backOfficeRestService
+												.loginBackOfficeBopayOut(userId, model.getBankActNo(),
+														model.getIfscCode(), model.getSegment(), model.getAmount(),
+														model.getPayoutReason(), 0);
+										if (boPayOutResponse != null && boPayOutResponse.size() > 0) {
+											JSONObject boPayResponseJson = (JSONObject) boPayOutResponse.get(0);
+											if (boPayResponseJson != null) {
+												JSONArray boPayOutData = (JSONArray) boPayResponseJson.get("DATA");
+												if (boPayOutData != null && boPayOutData.size() > 0) {
+													JSONArray boPayOutData2 = (JSONArray) boPayOutData.get(0);
+													if (boPayOutData2 != null && boPayOutData2.size() > 0) {
+														String originalData = (String) boPayOutData2.get(0);
+														if (StringUtil.isNotNullOrEmpty(originalData)) {
+															if (originalData.equalsIgnoreCase("Sucess:1")) {
+															} else {
+																String message = " Payout for user " + userId
+																		+ " with bank account no : "
+																		+ model.getBankActNo() + " with amount "
+																		+ model.getAmount()
+																		+ " is Failed in BackOffice ";
+																emailUtils.paymentFailureEmail(message);
+
+															}
+														} else {
+															String message = " Payout for user " + userId
+																	+ " with bank account no : " + model.getBankActNo()
+																	+ " with amount " + model.getAmount()
+																	+ " is Failed in BackOffice ";
+															emailUtils.paymentFailureEmail(message);
+														}
+													}
+												} else {
+													String message = " Payout for user " + userId
+															+ " with bank account no : " + model.getBankActNo()
+															+ " with amount " + model.getAmount()
+															+ " is Failed in BackOffice ";
+													emailUtils.paymentFailureEmail(message);
+												}
+											} else {
+												String message = " Payout for user " + userId
+														+ " with bank account no : " + model.getBankActNo()
+														+ " with amount " + model.getAmount()
+														+ " is Failed in BackOffice ";
+												emailUtils.paymentFailureEmail(message);
+											}
+										} else {
+											String message = " Payout for user " + userId + " with bank account no : "
+													+ model.getBankActNo() + " with amount " + model.getAmount()
+													+ " is Failed in BackOffice ";
+											emailUtils.paymentFailureEmail(message);
+										}
+									}
+								} else {
+									String message = " Payout for user " + userId + " with bank account no : "
+											+ model.getBankActNo() + " with amount " + model.getAmount()
+											+ " is Failed in BackOffice ";
+									emailUtils.paymentFailureEmail(message);
+								}
+							} else {
+								String message = " Payout for user " + userId + " with bank account no : "
+										+ model.getBankActNo() + " with amount " + model.getAmount()
+										+ " is Failed in BackOffice ";
+								emailUtils.paymentFailureEmail(message);
+							}
+						} else {
+							String message = " Payout for user " + userId + " with bank account no : "
+									+ model.getBankActNo() + " with amount " + model.getAmount()
+									+ " is Failed in BackOffice ";
+							emailUtils.paymentFailureEmail(message);
+						}
+					} else {
+						String message = " Payout for user " + userId + " with bank account no : "
+								+ model.getBankActNo() + " with amount " + model.getAmount()
+								+ " is Failed in BackOffice ";
+						emailUtils.paymentFailureEmail(message);
+					}
+				} catch (Exception e) {
+					Log.error(e.getMessage());
+					e.printStackTrace();
+				}
+			}
+		});
+		pool.shutdown();
+
+	}
+
+	/*
+	 * method to cancel payout
+	 * 
+	 * @author SOWMIYA
+	 * 
+	 * @return
+	 */
+	@Override
+	public RestResponse<GenericResponse> cancelPayOut(ClinetInfoModel info, PaymentReqModel model) {
+		try {
+			if (!validateCancelPayoutReq(info, model))
+				return prepareResponse.prepareFailedResponse(AppConstants.INVALID_PARAMETER);
+
+			JSONArray boPayOutResponse = (JSONArray) backOfficeRestService.loginBackOfficeBopayOut(info.getUserId(),
+					model.getBankActNo(), model.getIfscCode(), model.getSegment(), 0, model.getPayoutReason(), 0);
+			if (boPayOutResponse != null && boPayOutResponse.size() > 0) {
+				JSONObject boPayResponseJson = (JSONObject) boPayOutResponse.get(0);
+				if (boPayResponseJson != null) {
+					JSONArray boPayOutData = (JSONArray) boPayResponseJson.get("DATA");
+					if (boPayOutData != null && boPayOutData.size() > 0) {
+						JSONArray boPayOutData2 = (JSONArray) boPayOutData.get(0);
+						if (boPayOutData2 != null && boPayOutData2.size() > 0) {
+							String originalData = (String) boPayOutData2.get(0);
+							if (StringUtil.isNotNullOrEmpty(originalData)) {
+								if (originalData.equalsIgnoreCase("Sucess:1")) {
+									return prepareResponse.prepareSuccessResponseObject(originalData);
+								} else {
+									String[] data2 = originalData.split(",");
+									String statusContent = data2[1];
+									return prepareResponse.prepareFailedResponse(statusContent);
+
+								}
+							} else {
+								return prepareResponse.prepareFailedResponse(AppConstants.INTERNAL_ERROR);
+							}
+						}
+					} else {
+						return prepareResponse.prepareFailedResponse(AppConstants.INTERNAL_ERROR);
+					}
+				} else {
+					return prepareResponse.prepareFailedResponse(AppConstants.INTERNAL_ERROR);
+				}
+			} else {
+				return prepareResponse.prepareFailedResponse(AppConstants.INTERNAL_ERROR);
+			}
+
+		} catch (Exception e) {
+			Log.error(e.getMessage());
+			e.printStackTrace();
+		}
+		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+	}
+
+	/**
+	 * method to validate cancel payout parameters
+	 * 
+	 * @author SOWMIYA
+	 * @param paymentReqModel
+	 * @param info
+	 */
+	private boolean validateCancelPayoutReq(ClinetInfoModel info, PaymentReqModel model) {
+		if (StringUtil.isNotNullOrEmpty(info.getUserId()) && StringUtil.isNotNullOrEmpty(model.getBankActNo())
+				&& StringUtil.isNotNullOrEmpty(model.getIfscCode())
+				&& StringUtil.isNotNullOrEmpty(model.getSegment())) {
+			return true;
+		}
+		return false;
+	}
+}

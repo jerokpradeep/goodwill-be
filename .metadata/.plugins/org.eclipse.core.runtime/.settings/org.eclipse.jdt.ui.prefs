@@ -1,0 +1,13 @@
+content_assist_lru_history=<?xml version\="1.0" encoding\="UTF-8" standalone\="no"?><history maxLHS\="100" maxRHS\="10"><lhs name\="in.codifi.ws.model.kb.login.QuickAuthLoginReqModel"><rhs name\="in.codifi.ws.model.kb.login.QuickAuthLoginReqModel"/></lhs><lhs name\="in.codifi.ws.model.kb.login.ForgotPwdRestReqModel"><rhs name\="in.codifi.ws.model.kb.login.ForgotPwdRestReqModel"/></lhs><lhs name\="in.codifi.ws.model.kb.login.QuickAuthRespModel"><rhs name\="in.codifi.ws.model.kb.login.QuickAuthRespModel"/></lhs><lhs name\="in.codifi.ws.model.kc.ChangePwdRestReqModel"><rhs name\="in.codifi.ws.model.kc.ChangePwdRestReqModel"/></lhs><lhs name\="com.fasterxml.jackson.core.Versioned"><rhs name\="com.fasterxml.jackson.databind.ObjectMapper"/></lhs><lhs name\="com.fasterxml.jackson.core.ObjectCodec"><rhs name\="com.fasterxml.jackson.databind.ObjectMapper"/></lhs><lhs name\="com.fasterxml.jackson.core.TreeCodec"><rhs name\="com.fasterxml.jackson.databind.ObjectMapper"/></lhs><lhs name\="com.fasterxml.jackson.databind.ObjectMapper"><rhs name\="com.fasterxml.jackson.databind.ObjectMapper"/></lhs><lhs name\="in.codifi.ws.model.client.LogoutRestReqModel"><rhs name\="in.codifi.ws.model.client.LogoutRestReqModel"/></lhs><lhs name\="in.codifi.funds.model.request.PaymentReqModel"><rhs name\="in.codifi.funds.model.request.PaymentReqModel"/></lhs><lhs name\="in.codifi.funds.ws.service.BackOfficeRestService"><rhs name\="in.codifi.funds.ws.service.BackOfficeRestService"/></lhs><lhs name\="in.codifi.holdings.ws.model.GetHSTokenRestReqModel"><rhs name\="in.codifi.holdings.ws.model.GetHSTokenRestReqModel"/></lhs><lhs name\="in.codifi.holdings.ws.model.GetHSTokenRestRespModel"><rhs name\="in.codifi.holdings.ws.model.GetHSTokenRestRespModel"/></lhs></history>
+content_assist_number_of_computers=18
+content_assist_proposals_background=255,255,255
+content_assist_proposals_foreground=0,0,0
+eclipse.preferences.version=1
+markOccurrences=false
+org.eclipse.jdt.internal.ui.navigator.layout=2
+org.eclipse.jdt.internal.ui.navigator.librariesnode=true
+org.eclipse.jdt.ui.formatterprofiles.version=22
+spelling_locale_initialized=true
+typefilter_migrated_2=true
+useAnnotationsPrefPage=true
+useQuickDiffPrefPage=true

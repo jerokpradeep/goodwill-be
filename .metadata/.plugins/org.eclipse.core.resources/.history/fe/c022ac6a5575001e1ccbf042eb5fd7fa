@@ -1,0 +1,971 @@
+package in.codifi.orders.service;
+
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
+
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+
+import org.apache.commons.beanutils.BeanUtils;
+import org.eclipse.microprofile.context.ManagedExecutor;
+import org.jboss.resteasy.reactive.RestResponse;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import in.codifi.cache.model.ClinetInfoModel;
+import in.codifi.cache.model.ContractMasterModel;
+import in.codifi.cache.model.HoldingsData;
+import in.codifi.orders.config.HazelcastConfig;
+import in.codifi.orders.entity.primary.HoldingsEntity;
+import in.codifi.orders.model.request.MarginReqModel;
+import in.codifi.orders.model.request.OrderDetails;
+import in.codifi.orders.model.response.GenericResponse;
+import in.codifi.orders.repository.HoldingRepository;
+import in.codifi.orders.service.spec.OrderExecutionServiceSpec;
+import in.codifi.orders.utility.AppConstants;
+import in.codifi.orders.utility.AppUtil;
+import in.codifi.orders.utility.PrepareResponse;
+import in.codifi.orders.utility.StringUtil;
+import in.codifi.orders.ws.model.CancelOrderReqModel;
+import in.codifi.orders.ws.model.ExitSnoOrderReqModel;
+import in.codifi.orders.ws.model.ModifyOrderReqModel;
+import in.codifi.orders.ws.model.OrderMarginReqModel;
+import in.codifi.orders.ws.model.PlaceOrderReqModel;
+import in.codifi.orders.ws.service.OrdersRestService;
+import io.quarkus.logging.Log;
+
+@ApplicationScoped
+public class OrderExecutionService implements OrderExecutionServiceSpec {
+
+	@Inject
+	PrepareResponse prepareResponse;
+	@Inject
+	OrdersRestService restService;
+	@Inject
+	ManagedExecutor managedExecutor;
+	@Inject
+	AppUtil appUtil;
+	@Inject
+	HoldingRepository holdingsrepo;
+
+	/**
+	 * 
+	 * Method to execute place orders
+	 * 
+	 * @author Dinesh Kumar
+	 *
+	 * @param orderDetails
+	 * @param info
+	 * @return
+	 */
+	@Override
+	public RestResponse<List<GenericResponse>> placeOrder(List<OrderDetails> orderDetails, ClinetInfoModel info) {
+		try {
+
+			/** Verify session **/
+			String userSession = AppUtil.getUserSession(info.getUserId());
+			if (StringUtil.isNullOrEmpty(userSession))
+				return prepareResponse.prepareUnauthorizedResponseForList();
+
+			List<GenericResponse> response = executeOrdersSimultaneously(orderDetails, userSession, info);
+			return prepareResponse.prepareSuccessRespForList(response);
+		} catch (Exception e) {
+			e.printStackTrace();
+			Log.error(e.getMessage());
+		}
+		return prepareResponse.prepareFailedResponseForList(AppConstants.FAILED_STATUS);
+
+	}
+
+	/**
+	 * Method execute place order simultaneously
+	 * 
+	 * @author DINESH KUMAR
+	 *
+	 * @param ordersReq
+	 * @param userSession
+	 * @param info
+	 * @return
+	 */
+	private List<GenericResponse> executeOrdersSimultaneously(List<OrderDetails> ordersReq, String userSession,
+			ClinetInfoModel info) {
+
+		List<Callable<GenericResponse>> tasks = new ArrayList<>();
+		List<OrderDetails> newordersReq = new ArrayList<>();
+		newordersReq = sliceOrder(ordersReq);
+		for (OrderDetails orderDetails : newordersReq) {
+			Callable<GenericResponse> task = () -> {
+				/** Validate Request **/
+				if (!validateExecuteOrderReq(orderDetails))
+					return prepareResponse.prepareFailedResponseBody(AppConstants.INVALID_PARAMETER);
+
+				String req = preparePlaceOrderReq(orderDetails, userSession, info);
+
+				if (StringUtil.isNullOrEmpty(req)) {
+					return prepareResponse.prepareFailedResponseBody(AppConstants.FAILED_STATUS);
+				} else if (req.equalsIgnoreCase(AppConstants.CANNOT_SELL_CNC)) {
+					return prepareResponse.prepareFailedResponseBody(AppConstants.CANNOT_SELL_CNC);
+				}
+
+				/** Execute Place Order **/
+				return restService.executePlaceOrder(req, info.getUserId());
+
+			};
+			tasks.add(task);
+		}
+		return tasks.stream().map(callable -> {
+			try {
+				return callable.call();
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}).collect(Collectors.toList());
+	}
+
+	/**
+	 * 
+	 * Method to slice NFO order based on freeze Qty
+	 * 
+	 * @author Dinesh Kumar
+	 *
+	 * @param ordersReq
+	 * @return
+	 */
+	private List<OrderDetails> sliceOrder(List<OrderDetails> ordersReq) {
+		List<OrderDetails> orderDetailsList = new ArrayList<>();
+		try {
+			for (int i = 0; i < ordersReq.size(); i++) {
+				OrderDetails orderDetails = new OrderDetails();
+				orderDetails = ordersReq.get(i);
+				if (orderDetails.getExchange().equalsIgnoreCase("NFO")) {
+					String token = orderDetails.getToken();
+					String exchange = orderDetails.getExchange();
+					if (HazelcastConfig.getInstance().getContractMaster().get(exchange + "_" + token) != null) {
+						int qty = Integer.parseInt(orderDetails.getQty());
+						ContractMasterModel masterModel = HazelcastConfig.getInstance().getContractMaster()
+								.get(exchange + "_" + token);
+						int freezeQty = Integer.parseInt(masterModel.getFreezQty());
+						if (freezeQty > 0) {
+							if (qty > freezeQty) {
+								int tempQty = qty / freezeQty;
+								int balanceQty = qty;
+								if (tempQty > 0) {
+									List<OrderDetails> detailsList = new ArrayList<>();
+									for (int j = 0; j < tempQty; j++) {
+										OrderDetails orderDetails1 = new OrderDetails();
+										BeanUtils.copyProperties(orderDetails1, orderDetails);
+										if (balanceQty > freezeQty) {
+											orderDetails1.setQty(String.valueOf(freezeQty));
+											detailsList.add(orderDetails1);
+											balanceQty = balanceQty - freezeQty;
+										} else {
+											orderDetails1.setQty(String.valueOf(balanceQty));
+											detailsList.add(orderDetails1);
+											balanceQty = balanceQty - balanceQty;
+										}
+									}
+									if (balanceQty > 0) {
+										OrderDetails orderDetails2 = new OrderDetails();
+										BeanUtils.copyProperties(orderDetails2, orderDetails);
+										orderDetails2.setQty(String.valueOf(balanceQty));
+										detailsList.add(orderDetails2);
+									}
+									orderDetailsList.addAll(detailsList);
+								} else {
+									orderDetailsList.add(orderDetails);
+								}
+							} else {
+								orderDetailsList.add(orderDetails);
+							}
+						} else {
+							orderDetailsList.add(orderDetails);
+						}
+					} else {
+						orderDetailsList.add(orderDetails);
+					}
+				} else {
+					orderDetailsList.add(orderDetails);
+				}
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			Log.error(e.getMessage());
+		}
+		return orderDetailsList;
+	}
+
+	/**
+	 * Method to validate place order request
+	 * 
+	 * @author Dinesh
+	 *
+	 * @param orderDetails
+	 * @return
+	 */
+	private boolean validateExecuteOrderReq(OrderDetails details) {
+		if (StringUtil.isNotNullOrEmpty(details.getExchange())
+				&& StringUtil.isNotNullOrEmpty(details.getTradingSymbol())
+				&& StringUtil.isNotNullOrEmpty(details.getQty()) && StringUtil.isNotNullOrEmpty(details.getPrice())
+				&& StringUtil.isNotNullOrEmpty(details.getProduct())
+				&& StringUtil.isNotNullOrEmpty(details.getTransType())
+				&& StringUtil.isNotNullOrEmpty(details.getPriceType())
+				&& StringUtil.isNotNullOrEmpty(details.getOrderType()) && StringUtil.isNotNullOrEmpty(details.getRet())
+				&& StringUtil.isNotNullOrEmpty(details.getSource())) {
+			return true;
+
+		}
+		return false;
+	}
+
+	/**
+	 * 
+	 * Method to prepare request to execute place order
+	 * 
+	 * @author Dinesh Kumar
+	 *
+	 * @param orderDetails
+	 * @param session
+	 * @return
+	 */
+	private String preparePlaceOrderReq(OrderDetails details, String session, ClinetInfoModel info) {
+		String request = "";
+		try {
+			PlaceOrderReqModel model = new PlaceOrderReqModel();
+			ObjectMapper mapper = new ObjectMapper();
+			// mandatory fields
+			model.setUid(info.getUcc());
+			model.setActid(info.getUcc());
+			model.setExch(details.getExchange());
+			model.setTsym(URLEncoder.encode(details.getTradingSymbol(), AppConstants.UTF_8));
+			model.setQty(details.getQty());
+			model.setPrc(details.getPrice());
+			model.setTrantype(details.getTransType());
+			model.setRet(details.getRet());
+
+			if ((details.getExchange().equalsIgnoreCase("NSE") || details.getExchange().equalsIgnoreCase("BSE"))
+					&& (details.getTransType().equalsIgnoreCase("S") || details.getTransType().equalsIgnoreCase("SELL"))
+					&& (details.getProduct().equalsIgnoreCase("CNC") || details.getProduct().equalsIgnoreCase("C"))) {
+				List<HoldingsData> dbHoldings = new ArrayList<>();
+				if (HazelcastConfig.getInstance().getUploadedHoldingsKB().get(info.getUserId()) != null) {
+					dbHoldings = HazelcastConfig.getInstance().getUploadedHoldingsKB().get(info.getUserId());
+				} else {
+					dbHoldings = getHoldingsForUser(info.getUserId());
+				}
+				String isin = HazelcastConfig.getInstance().getIsinByTokenKB()
+						.get(details.getToken() + "_" + details.getExchange());
+				if (StringUtil.isNotNullOrEmpty(isin)) {
+					for (HoldingsData holdingsData : dbHoldings) {
+						if (holdingsData.getIsin().equalsIgnoreCase(isin)) {
+							if (holdingsData.getAuthFlag() == 0) {
+								Log.error(AppConstants.CANNOT_SELL_CNC);
+								return AppConstants.CANNOT_SELL_CNC;
+							}
+							break;
+						}
+					}
+				} else {
+					Log.error("Invalid Symbol to get isin");
+					return request;
+				}
+			}
+			String priceType = appUtil.getRestPriceType(details.getPriceType());
+			if (StringUtil.isNullOrEmpty(priceType)) {
+				Log.error("Price type is empty. Not able to map for place order request");
+				return request;
+			} else {
+				model.setPrctyp(priceType);
+			}
+
+			String productType = appUtil.getRestProductType(details.getProduct());
+			if (StringUtil.isNullOrEmpty(productType)) {
+				Log.error("Product type is empty. Not able to map for place order request");
+				return request;
+			}
+
+			String restOrderType = appUtil.getRestOrderType(details.getOrderType());
+			if (StringUtil.isNullOrEmpty(restOrderType)) {
+				Log.error("Order type is empty to map for place order request");
+				return request;
+			}
+
+			String orderType = details.getOrderType().trim();
+			if (orderType.equalsIgnoreCase(AppConstants.AMO)) {
+				model.setAmo("yes");
+				model.setPrd(productType);
+			} else if (orderType.equalsIgnoreCase(AppConstants.REGULAR)) {
+				model.setPrd(productType);
+			} else if (orderType.equalsIgnoreCase(AppConstants.BRACKET)
+					|| orderType.equalsIgnoreCase(AppConstants.COVER)) {
+				model.setPrd(restOrderType);
+			} else {
+				Log.error("Invalid order type. Not able to map for place order request");
+				return request;
+			}
+
+			// non - mandatory filed
+			if (StringUtil.isNotNullOrEmpty(details.getTriggerPrice())) {
+				double trgprc = Double.valueOf(details.getTriggerPrice());
+				if (trgprc > 0) {
+					model.setTrgprc(details.getTriggerPrice());
+				}
+			}
+
+			if (StringUtil.isNotNullOrEmpty(details.getDisclosedQty())) {
+				int disQty = Integer.valueOf(details.getDisclosedQty());
+				if (disQty > 0) {
+					model.setDscqty(details.getDisclosedQty());
+				}
+			}
+
+			if (StringUtil.isNotNullOrEmpty(details.getMktProtection())) {
+				double mktProtection = Double.valueOf(details.getMktProtection());
+				if (mktProtection > 0) {
+					model.setTrgprc(details.getMktProtection());
+				}
+			}
+
+//			if (StringUtil.isNotNullOrEmpty(details.getTarget())) {
+//				float target = Float.parseFloat(details.getTarget());
+//				float price = Float.parseFloat(details.getPrice());
+//				float targetinPoints = Math.abs(price - target);
+//				Log.info("Target-" + targetinPoints);
+//				model.setBpprc(String.valueOf(targetinPoints));
+//			}
+//			if (StringUtil.isNotNullOrEmpty(details.getStopLoss())) {
+//				float stopLoss = Float.parseFloat(details.getStopLoss());
+//				float price = Float.parseFloat(details.getPrice());
+//				if (price == 0 && StringUtil.isNotNullOrEmpty(details.getLtp())) {
+//					price = Float.parseFloat(details.getLtp());
+//				}
+//				float stopLossPoints = Math.abs(price - stopLoss);
+//				Log.info("stopLossPoints-" + stopLossPoints);
+//				model.setBlprc(String.valueOf(stopLossPoints));
+//			}
+
+			/** KB need target and SL in ticks **/
+			if (StringUtil.isNotNullOrEmpty(details.getTarget())) {
+				double target = Double.valueOf(details.getTarget());
+				if (target > 0) {
+					model.setTrgprc(details.getTarget());
+				}
+			}
+			if (StringUtil.isNotNullOrEmpty(details.getStopLoss())) {
+				double stopLoss = Double.valueOf(details.getStopLoss());
+				if (stopLoss > 0) {
+					model.setTrgprc(details.getStopLoss());
+				}
+			}
+
+			if (StringUtil.isNotNullOrEmpty(details.getTrailingStopLoss())) {
+				model.setTrailprc(details.getTrailingStopLoss());
+			}
+
+			String json = mapper.writeValueAsString(model);
+			request = AppConstants.JDATA + AppConstants.SYMBOL_EQUAL + json + AppConstants.SYMBOL_AND
+					+ AppConstants.JKEY + AppConstants.SYMBOL_EQUAL + session;
+		} catch (Exception e) {
+			e.printStackTrace();
+			Log.error(e.getMessage());
+		}
+		return request;
+	}
+
+	/**
+	 * 
+	 * Method to load uploaded holdings foe users
+	 * 
+	 * @author Dinesh Kumar
+	 *
+	 * @param userId
+	 */
+	private List<HoldingsData> getHoldingsForUser(String userId) {
+		List<HoldingsData> holdingsList = new ArrayList<>();
+		try {
+			List<HoldingsEntity> dbData = holdingsrepo.findAllByUserId(userId);
+			for (HoldingsEntity holdingsEntity : dbData) {
+				HoldingsData holdingsData = new HoldingsData();
+				holdingsData.setActualPrice(holdingsEntity.getActualPrice());
+				holdingsData.setIsin(holdingsEntity.getIsin());
+				holdingsData.setAuthFlag(holdingsEntity.getAuthFlag());
+				holdingsData.setPoaStatus(holdingsEntity.getPoaStatus());
+				holdingsData.setUserId(holdingsEntity.getUserId());
+				holdingsData.setClosePrice(holdingsEntity.getClosePrice());
+				holdingsData.setAuthQty(holdingsEntity.getAuthQty());
+				holdingsData.setProduct(holdingsEntity.getProduct());
+				holdingsList.add(holdingsData);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			Log.error(e.getMessage());
+		}
+		return holdingsList;
+	}
+
+	/**
+	 * Method to modify order
+	 * 
+	 * @author DINESH KUMAR
+	 *
+	 * @param orderDetails
+	 * @param info
+	 * @return
+	 */
+	@Override
+	public RestResponse<GenericResponse> modifyOrder(OrderDetails orderDetails, ClinetInfoModel info) {
+		try {
+
+			/** Validate Request **/
+			if (!validateModifyOrderReq(orderDetails))
+				return prepareResponse.prepareFailedResponse(AppConstants.INVALID_PARAMETER);
+
+			/** Verify session **/
+			String userSession = AppUtil.getUserSession(info.getUserId());
+			if (StringUtil.isNullOrEmpty(userSession))
+				return prepareResponse.prepareUnauthorizedResponse();
+
+			/** prepare request body */
+			String req = prepareModifyOrderReq(orderDetails, userSession, info);
+			if (StringUtil.isNullOrEmpty(req))
+				return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+
+			/** Execute modify order **/
+			return restService.modifyOrder(req, info.getUserId());
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			Log.error(e.getMessage());
+		}
+		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+	}
+
+	/**
+	 * Method to validate modify order request
+	 * 
+	 * @author Nesan
+	 *
+	 * @param orderDetails
+	 * @return
+	 */
+	private boolean validateModifyOrderReq(OrderDetails orderDetails) {
+		if (StringUtil.isNotNullOrEmpty(orderDetails.getExchange())
+				&& StringUtil.isNotNullOrEmpty(orderDetails.getOrderNo())
+				&& StringUtil.isNotNullOrEmpty(orderDetails.getTradingSymbol())) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Method to prepare request to execute modify order
+	 * 
+	 * @author Nesan
+	 *
+	 * @param orderDetails
+	 * @param session
+	 * @return
+	 */
+	private String prepareModifyOrderReq(OrderDetails orderDetails, String session, ClinetInfoModel info) {
+		String request = "";
+		try {
+			ModifyOrderReqModel model = new ModifyOrderReqModel();
+			ObjectMapper mapper = new ObjectMapper();
+			// mandatory fields
+			model.setUid(info.getUserId());
+			model.setNorenordno(orderDetails.getOrderNo());
+			model.setExch(orderDetails.getExchange());
+			model.setTsym(orderDetails.getTradingSymbol());
+
+			// non-mandatory fields
+			if (StringUtil.isNotNullOrEmpty(orderDetails.getPriceType())) {
+				String priceType = appUtil.getRestPriceType(orderDetails.getPriceType());
+				if (StringUtil.isNullOrEmpty(priceType)) {
+					Log.error("Price type is empty. Not able to map for modify order request");
+					return request;
+				} else {
+					model.setPrctyp(priceType);
+				}
+			}
+
+			if (StringUtil.isNotNullOrEmpty(orderDetails.getQty())) {
+				model.setQty(orderDetails.getQty());
+			}
+
+			if (StringUtil.isNotNullOrEmpty(orderDetails.getPrice())) {
+				model.setPrc(orderDetails.getPrice());
+			}
+
+			if (StringUtil.isNotNullOrEmpty(orderDetails.getRet())) {
+				model.setRet(orderDetails.getRet());
+			}
+
+			if (StringUtil.isNotNullOrEmpty(orderDetails.getMktProtection())) {
+				model.setMktProtection(orderDetails.getMktProtection());
+			}
+
+			if (StringUtil.isNotNullOrEmpty(orderDetails.getTriggerPrice())) {
+				model.setTrgprc(orderDetails.getTriggerPrice());
+			}
+
+			if (StringUtil.isNotNullOrEmpty(orderDetails.getDisclosedQty())) {
+				model.setDscqty(orderDetails.getDisclosedQty());
+			}
+
+			if (StringUtil.isNotNullOrEmpty(orderDetails.getTarget())) {
+				model.setBpprc(orderDetails.getTarget());
+			}
+
+			if (StringUtil.isNotNullOrEmpty(orderDetails.getStopLoss())) {
+				model.setBlprc(orderDetails.getStopLoss());
+			}
+			if (StringUtil.isNotNullOrEmpty(orderDetails.getTrailingStopLoss())) {
+				model.setTrailprc(orderDetails.getTrailingStopLoss());
+			}
+
+			String json = mapper.writeValueAsString(model);
+			request = AppConstants.JDATA + AppConstants.SYMBOL_EQUAL + json + AppConstants.SYMBOL_AND
+					+ AppConstants.JKEY + AppConstants.SYMBOL_EQUAL + session;
+		} catch (Exception e) {
+			e.printStackTrace();
+			Log.error(e.getMessage());
+		}
+		return request;
+
+	}
+
+	/**
+	 * Method to cancel multiple orders or single orders
+	 * 
+	 * @author DINESH KUMAR
+	 *
+	 * @param orderDetails
+	 * @param info
+	 * @return
+	 */
+	@Override
+	public RestResponse<List<GenericResponse>> cancelOrder(List<OrderDetails> orderDetails, ClinetInfoModel info) {
+		try {
+			/** Verify session **/
+			String userSession = AppUtil.getUserSession(info.getUserId());
+			if (StringUtil.isNullOrEmpty(userSession))
+				return prepareResponse.prepareUnauthorizedResponseForList();
+
+			List<GenericResponse> response = cancelOrdersSimultaneously(orderDetails, userSession, info);
+			return prepareResponse.prepareSuccessRespForList(response);
+		} catch (Exception e) {
+			e.printStackTrace();
+			Log.error(e.getMessage());
+		}
+		return prepareResponse.prepareFailedResponseForList(AppConstants.FAILED_STATUS);
+	}
+
+	/**
+	 * Method to execute cancel order simultaneously
+	 * 
+	 * @author DINESH KUMAR
+	 *
+	 * @param ordersReq
+	 * @param userSession
+	 * @param info
+	 * @return
+	 */
+	private List<GenericResponse> cancelOrdersSimultaneously(List<OrderDetails> ordersReq, String userSession,
+			ClinetInfoModel info) {
+
+		List<Callable<GenericResponse>> tasks = new ArrayList<>();
+		for (OrderDetails orderDetails : ordersReq) {
+			Callable<GenericResponse> task = () -> {
+				/** Validate Request **/
+				if (!validateCancelReq(orderDetails))
+					return prepareResponse.prepareFailedResponseBody(AppConstants.INVALID_PARAMETER);
+
+				String req = prepareCancelOrderReq(orderDetails, userSession, info);
+				if (StringUtil.isNullOrEmpty(req))
+					return prepareResponse.prepareFailedResponseBody(AppConstants.FAILED_STATUS);
+
+				/** Execute cancel order **/
+				return restService.executeCancelOrder(req, info.getUserId());
+
+			};
+			tasks.add(task);
+		}
+		return tasks.stream().map(callable -> {
+			try {
+				return callable.call();
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}).collect(Collectors.toList());
+	}
+
+	/**
+	 * Method to validate cancel order request
+	 * 
+	 * @author Nesan
+	 *
+	 * @param orderDetails
+	 * @return
+	 */
+	private boolean validateCancelReq(OrderDetails orderDetails) {
+		if (StringUtil.isNotNullOrEmpty(orderDetails.getOrderNo())) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Method to prepare request to execute cancel order
+	 * 
+	 * @author Nesan
+	 *
+	 * @param orderDetails
+	 * @param session
+	 * @return
+	 */
+	private String prepareCancelOrderReq(OrderDetails orderDetails, String session, ClinetInfoModel info) {
+		String request = "";
+		try {
+			CancelOrderReqModel model = new CancelOrderReqModel();
+			ObjectMapper mapper = new ObjectMapper();
+			// mandatory fields
+			model.setUid(info.getUserId());
+			model.setNorenordno(orderDetails.getOrderNo());
+			String json = mapper.writeValueAsString(model);
+			request = AppConstants.JDATA + AppConstants.SYMBOL_EQUAL + json + AppConstants.SYMBOL_AND
+					+ AppConstants.JKEY + AppConstants.SYMBOL_EQUAL + session;
+		} catch (Exception e) {
+			e.printStackTrace();
+			Log.error(e.getMessage());
+		}
+		return request;
+	}
+
+	/**
+	 * 
+	 * Method to get order margin
+	 * 
+	 * @author Dinesh Kumar
+	 *
+	 * @param orderReqModel
+	 * @return
+	 */
+	@Override
+	public RestResponse<GenericResponse> getOrderMargin(MarginReqModel marginReqModel, ClinetInfoModel info) {
+		try {
+			/** Validate Request **/
+			if (!validateOrderMarginReq(marginReqModel))
+				return prepareResponse.prepareFailedResponse(AppConstants.INVALID_PARAMETER);
+
+			/** Verify session **/
+			String userSession = AppUtil.getUserSession(info.getUserId());
+			if (StringUtil.isNullOrEmpty(userSession))
+				return prepareResponse.prepareUnauthorizedResponse();
+
+			/** prepare request body */
+			String req = prepareOrderMarginReq(marginReqModel, userSession, info);
+			if (StringUtil.isNullOrEmpty(req))
+				return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+
+			/** Get order margin **/
+			return restService.getOrderMargin(req, info.getUserId());
+		} catch (
+
+		Exception e) {
+			e.printStackTrace();
+			Log.error(e.getMessage());
+		}
+		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+	}
+
+	/**
+	 * 
+	 * Method to validate order margin request
+	 * 
+	 * @author Dinesh Kumar
+	 *
+	 * @param marginReqModel
+	 * @return
+	 */
+	private boolean validateOrderMarginReq(MarginReqModel marginReqModel) {
+		if (StringUtil.isNotNullOrEmpty(marginReqModel.getExchange())
+				&& StringUtil.isNotNullOrEmpty(marginReqModel.getTradingSymbol())
+				&& StringUtil.isNotNullOrEmpty(marginReqModel.getQty())
+				&& StringUtil.isNotNullOrEmpty(marginReqModel.getPrice())
+				&& StringUtil.isNotNullOrEmpty(marginReqModel.getProduct())
+				&& StringUtil.isNotNullOrEmpty(marginReqModel.getTransType())
+				&& StringUtil.isNotNullOrEmpty(marginReqModel.getPriceType())
+				&& StringUtil.isNotNullOrEmpty(marginReqModel.getOrderType())) {
+			return true;
+
+		}
+
+		return false;
+	}
+
+	/**
+	 * 
+	 * Method to Prepare order margin request
+	 * 
+	 * @author Dinesh Kumar
+	 *
+	 * @param marginReqModel
+	 * @param userSession
+	 * @return
+	 */
+	private String prepareOrderMarginReq(MarginReqModel marginReqModel, String session, ClinetInfoModel info) {
+		String request = "";
+		try {
+			OrderMarginReqModel model = new OrderMarginReqModel();
+			ObjectMapper mapper = new ObjectMapper();
+			// mandatory fields
+			model.setUid(info.getUserId());
+			model.setActid(info.getUserId());
+			model.setExch(marginReqModel.getExchange());
+			model.setTsym(URLEncoder.encode(marginReqModel.getTradingSymbol(), AppConstants.UTF_8));
+			model.setQty(marginReqModel.getQty());
+			model.setPrc(marginReqModel.getPrice());
+			model.setTrantype(marginReqModel.getTransType());
+
+			String priceType = appUtil.getRestPriceType(marginReqModel.getPriceType());
+			if (StringUtil.isNullOrEmpty(priceType)) {
+				Log.error("Price type is empty. Not able to map for get margin request");
+				return request;
+			} else {
+				model.setPrctyp(priceType);
+			}
+
+			String productType = appUtil.getRestProductType(marginReqModel.getProduct());
+			if (StringUtil.isNullOrEmpty(productType)) {
+				Log.error("Product type is empty. Not able to map for get margin request");
+				return request;
+			}
+
+			String restOrderType = appUtil.getRestOrderType(marginReqModel.getOrderType());
+			if (StringUtil.isNullOrEmpty(restOrderType)) {
+				Log.error("Order type is empty to map for get margin request");
+				return request;
+			}
+
+			String orderType = marginReqModel.getOrderType().trim();
+			if (orderType.equalsIgnoreCase(AppConstants.AMO) || orderType.equalsIgnoreCase(AppConstants.REGULAR)) {
+				model.setPrd(productType);
+			} else if (orderType.equalsIgnoreCase(AppConstants.BRACKET)
+					|| orderType.equalsIgnoreCase(AppConstants.COVER)) {
+				model.setPrd(restOrderType);
+			} else {
+				Log.error("Invalid order type. Not able to map for place order request");
+				return request;
+			}
+
+			// non - mandatory filed
+			if (StringUtil.isNotNullOrEmpty(marginReqModel.getTriggerPrice())) {
+				model.setTrgprc(marginReqModel.getTriggerPrice());
+			}
+			if (StringUtil.isNotNullOrEmpty(marginReqModel.getOpenOrderQty())) {
+				model.setRorgqty(marginReqModel.getOpenOrderQty());
+			}
+			if (StringUtil.isNotNullOrEmpty(marginReqModel.getFillshares())) {
+				model.setFillshares(marginReqModel.getFillshares());
+			}
+			if (StringUtil.isNotNullOrEmpty(marginReqModel.getOpenOrderprice())) {
+				model.setRorgprc(marginReqModel.getOpenOrderprice());
+			}
+			if (StringUtil.isNotNullOrEmpty(marginReqModel.getOpenOrderTriggerPrice())) {
+				model.setOrgtrgprc(marginReqModel.getOpenOrderTriggerPrice());
+			}
+			if (StringUtil.isNotNullOrEmpty(marginReqModel.getOrderNo())) {
+				model.setNorenordno(marginReqModel.getOrderNo());
+			}
+			if (StringUtil.isNotNullOrEmpty(marginReqModel.getSnonum())) {
+				model.setSnonum(marginReqModel.getSnonum());
+			}
+			if (StringUtil.isNotNullOrEmpty(marginReqModel.getStopLoss())) {
+				model.setBlprc(marginReqModel.getStopLoss());
+			}
+
+			String json = mapper.writeValueAsString(model);
+			request = AppConstants.JDATA + AppConstants.SYMBOL_EQUAL + json + AppConstants.SYMBOL_AND
+					+ AppConstants.JKEY + AppConstants.SYMBOL_EQUAL + session;
+		} catch (Exception e) {
+			e.printStackTrace();
+			Log.error(e.getMessage());
+		}
+		return request;
+	}
+
+	/**
+	 * Method to square off positions
+	 * 
+	 * @author DINESH KUMAR
+	 *
+	 * @param orderDetails
+	 * @param info
+	 * @return
+	 */
+	@Override
+	public RestResponse<List<GenericResponse>> positionSquareOff(List<OrderDetails> orderDetails,
+			ClinetInfoModel info) {
+		try {
+
+			Log.info("Square Off position started");
+			/** Verify session **/
+			String userSession = AppUtil.getUserSession(info.getUserId());
+			if (StringUtil.isNullOrEmpty(userSession))
+				return prepareResponse.prepareUnauthorizedResponseForList();
+
+			List<GenericResponse> response = executeOrdersSimultaneously(orderDetails, userSession, info);
+			return prepareResponse.prepareSuccessRespForList(response);
+		} catch (Exception e) {
+			e.printStackTrace();
+			Log.error(e.getMessage());
+		}
+		Log.info("Square Off position Ended");
+		return prepareResponse.prepareFailedResponseForList(AppConstants.FAILED_STATUS);
+	}
+
+	/**
+	 * 
+	 * Method to execute basket orders
+	 * 
+	 * @author Dinesh Kumar
+	 *
+	 * @param orderDetails
+	 * @param info
+	 * @return
+	 */
+	@Override
+	public List<GenericResponse> executeBasketOrder(List<OrderDetails> orderDetails, ClinetInfoModel info) {
+		List<GenericResponse> responseList = new ArrayList<>();
+		GenericResponse response = new GenericResponse();
+		try {
+			/** Verify session **/
+			String userSession = AppUtil.getUserSession(info.getUserId());
+			if (StringUtil.isNullOrEmpty(userSession)) {
+				response = prepareResponse.prepareUnauthorizedResponseBody();
+				responseList.add(response);
+				return responseList;
+			}
+
+			List<GenericResponse> genericResponses = executeOrdersSimultaneously(orderDetails, userSession, info);
+			return genericResponses;
+		} catch (Exception e) {
+			e.printStackTrace();
+			Log.error(e.getMessage());
+		}
+		response = prepareResponse.prepareFailedResponseBody(AppConstants.FAILED_STATUS);
+		responseList.add(response);
+		return responseList;
+	}
+
+	/**
+	 * method to exit BO orders
+	 * 
+	 * @author sowmiya
+	 */
+	@Override
+	public RestResponse<List<GenericResponse>> exitSnoOrder(List<OrderDetails> orderDetails, ClinetInfoModel info) {
+		try {
+			/** Verify session **/
+			String userSession = AppUtil.getUserSession(info.getUserId());
+			if (StringUtil.isNullOrEmpty(userSession))
+				return prepareResponse.prepareUnauthorizedResponseForList();
+
+			List<GenericResponse> response = exitSnoOrderSimultaneously(orderDetails, userSession, info);
+			return prepareResponse.prepareSuccessRespForList(response);
+		} catch (Exception e) {
+			e.printStackTrace();
+			Log.error(e.getMessage());
+		}
+		return prepareResponse.prepareFailedResponseForList(AppConstants.FAILED_STATUS);
+	}
+
+	/**
+	 * method exit
+	 * 
+	 * @param orderDetails
+	 * @param userSession
+	 * @param info
+	 * @return
+	 */
+	private List<GenericResponse> exitSnoOrderSimultaneously(List<OrderDetails> ordersReq, String userSession,
+			ClinetInfoModel info) {
+		List<Callable<GenericResponse>> tasks = new ArrayList<>();
+		for (OrderDetails orderDetails : ordersReq) {
+			Callable<GenericResponse> task = () -> {
+				/** Validate Request **/
+				if (!validateExitSnoReq(orderDetails))
+					return prepareResponse.prepareFailedResponseBody(AppConstants.INVALID_PARAMETER);
+
+				String req = prepareSnoOrderReq(orderDetails, userSession, info);
+				if (StringUtil.isNullOrEmpty(req))
+					return prepareResponse.prepareFailedResponseBody(AppConstants.FAILED_STATUS);
+
+				/** Execute cancel order **/
+				return restService.executeExitSnoOrder(req, info.getUserId());
+
+			};
+			tasks.add(task);
+		}
+		return tasks.stream().map(callable -> {
+			try {
+				return callable.call();
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}).collect(Collectors.toList());
+	}
+
+	/**
+	 * method to prepare sno order request
+	 * 
+	 * @author sowmiya
+	 * @param orderDetails
+	 * @param userSession
+	 * @param info
+	 * @return
+	 */
+	private String prepareSnoOrderReq(OrderDetails orderDetails, String userSession, ClinetInfoModel info) {
+		String request = "";
+		try {
+			ExitSnoOrderReqModel model = new ExitSnoOrderReqModel();
+			ObjectMapper mapper = new ObjectMapper();
+			// mandatory fields
+			model.setUid(info.getUcc());
+			model.setNorenordno(orderDetails.getOrderNo());
+
+			String restOrderType = appUtil.getRestOrderType(orderDetails.getOrderType());
+			if (StringUtil.isNullOrEmpty(restOrderType)) {
+				Log.error("Order type is empty to map for exit BO/CO order request");
+				return request;
+			}
+			model.setProduct(restOrderType);
+			String json = mapper.writeValueAsString(model);
+			request = AppConstants.JDATA + AppConstants.SYMBOL_EQUAL + json + AppConstants.SYMBOL_AND
+					+ AppConstants.JKEY + AppConstants.SYMBOL_EQUAL + userSession;
+		} catch (Exception e) {
+			e.printStackTrace();
+			Log.error(e.getMessage());
+		}
+		return request;
+
+	}
+
+	/**
+	 * Method to validate exit BO/CO orders request
+	 * 
+	 * @author Dinesh Kumar
+	 *
+	 * @param orderDetails
+	 * @return
+	 */
+	private boolean validateExitSnoReq(OrderDetails orderDetails) {
+		if (StringUtil.isNotNullOrEmpty(orderDetails.getOrderNo())
+				&& StringUtil.isNotNullOrEmpty(orderDetails.getOrderType())) {
+			return true;
+		}
+		return false;
+	}
+}

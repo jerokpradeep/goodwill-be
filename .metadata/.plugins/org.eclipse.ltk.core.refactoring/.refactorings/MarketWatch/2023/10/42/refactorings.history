@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Rename type &apos;in.codifi.api.service.AdvanceMWTestController&apos; to &apos;AdvanceMWTestService&apos;&#x0D;&#x0A;- Original project: &apos;MarketWatch&apos;&#x0D;&#x0A;- Original element: &apos;in.codifi.api.service.AdvanceMWTestController&apos;&#x0D;&#x0A;- Renamed element: &apos;in.codifi.api.service.AdvanceMWTestService&apos;&#x0D;&#x0A;- Update references to refactored element&#x0D;&#x0A;- Update textual occurrences in comments and strings" description="Rename type &apos;AdvanceMWTestController&apos;" flags="589830" id="org.eclipse.jdt.ui.rename.type" input="/src\/main\/java=/optional=/true=/=/maven.pomderived=/true=/&lt;in.codifi.api.service{AdvanceMWTestController.java[AdvanceMWTestController" matchStrategy="1" name="AdvanceMWTestService" qualified="false" references="true" similarDeclarations="false" stamp="1697469323246" textual="false" version="1.0"/>
+</session>
