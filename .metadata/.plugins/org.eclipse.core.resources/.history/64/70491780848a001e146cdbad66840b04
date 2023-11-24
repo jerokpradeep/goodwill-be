@@ -1,0 +1,163 @@
+quarkus.http.port=9013
+quarkus.package.type=uber-jar
+quarkus.transaction-manager.default-transaction-timeout = 20s
+
+# Keycloak client configuration
+auth.org.server.url=https://idaas.gwcindia.in/idaas
+auth.org.server.realm=goodwill
+auth.org.grant.type=password
+quarkus.oidc.auth-server-url=${auth.org.server.url}/realms/${auth.org.server.realm}
+quarkus.oidc.client-id=goodwill
+quarkus.oidc.credentials.secret=nU6iHu9tqZUUzXTZILY1aSuIiSj6Ozw1
+quarkus.oidc.application-type=web-app
+
+quarkus.rest-client.token-service.url=${auth.org.server.url}/realms/${auth.org.server.realm}/protocol/openid-connect
+quarkus.rest-client.token-service.scope=javax.inject.Singleton 
+quarkus.tls.trust-all=true
+quarkus.rest-client.extensions-api.hostname-verifier=io.quarkus.restclient.NoopHostnameVerifier
+
+# Keycloak admin configuration
+auth.org.server.client-secret=QBmug0qIjdMb76OzXoMg6XiUSEhmSFGd
+auth.org.server.client-id=admin-cli
+auth.org.server.grant-type=client_credentials
+
+quarkus.rest-client.auth-user-api.url=${auth.org.server.url}/admin/realms/${auth.org.server.realm}
+quarkus.rest-client.auth-user-api.scope=javax.inject.Singleton
+
+#Application Properties for HZ
+config.app.hazel.cluster=goodwill
+config.app.hazel.address=127.0.0.1:5701
+
+# Database properties
+quarkus.datasource.db-kind=mysql
+quarkus.datasource.jdbc.max-size=50
+quarkus.datasource.jdbc.min-size=1
+quarkus.hibernate-orm.database.generation=none
+quarkus.hibernate-orm.dialect=org.hibernate.dialect.MySQL8Dialect
+quarkus.hibernate-orm.physical-naming-strategy=org.springframework.boot.orm.jpa.hibernate.SpringPhysicalNamingStrategy
+quarkus.hibernate-orm.implicit-naming-strategy=org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+quarkus.hibernate-orm.packages=in.codifi.admin.entity
+
+#Local
+#quarkus.datasource.username=root
+#quarkus.datasource.password=Stoneage&8
+#quarkus.datasource.jdbc.url=jdbc:mysql://127.0.0.1:3306/goodwill?rewriteBatchedStatements=true&useSSL=false&allowPublicKeyRetrieval=true
+# UAT
+quarkus.datasource.username=root
+quarkus.datasource.password=St0ne@ge@202#
+quarkus.datasource.jdbc.url=jdbc:mysql://127.0.0.1:3306/goodwill?rewriteBatchedStatements=true&useSSL=false&allowPublicKeyRetrieval=true
+
+#Logs Database properties
+quarkus.datasource.logs.db-kind=mysql
+quarkus.hibernate-orm.logs.database.generation=create
+quarkus.hibernate-orm.logs.datasource=logs
+quarkus.datasource.logs.jdbc.max-size=50
+quarkus.datasource.logs.jdbc.min-size=1
+quarkus.hibernate-orm.logs.physical-naming-strategy=org.springframework.boot.orm.jpa.hibernate.SpringPhysicalNamingStrategy
+quarkus.hibernate-orm.logs.implicit-naming-strategy=org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+quarkus.hibernate-orm.logs.packages=in.codifi.admin.entity.logs
+
+#Local
+#quarkus.datasource.logs.username=root
+#quarkus.datasource.logs.password=Stoneage&8
+#quarkus.datasource.logs.jdbc.url=jdbc:mysql://127.0.0.1:3306/logs_db?rewriteBatchedStatements=true&useSSL=false&allowPublicKeyRetrieval=true
+
+# UAT
+quarkus.datasource.logs.username=root
+quarkus.datasource.logs.password=St0ne@ge@202#
+quarkus.datasource.logs.jdbc.url=jdbc:mysql://localhost:3306/logs_db?rewriteBatchedStatements=true&useSSL=false&allowPublicKeyRetrieval=true
+
+#CommonUtils Database properties
+quarkus.datasource.common.db-kind=mysql
+quarkus.hibernate-orm.common.database.generation=none
+quarkus.hibernate-orm.common.datasource=common
+quarkus.datasource.common.jdbc.max-size=50
+quarkus.datasource.common.jdbc.min-size=1
+quarkus.hibernate-orm.common.physical-naming-strategy=org.springframework.boot.orm.jpa.hibernate.SpringPhysicalNamingStrategy
+quarkus.hibernate-orm.common.implicit-naming-strategy=org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+quarkus.hibernate-orm.common.packages=in.codifi.admin.entity.common
+
+#Local
+#quarkus.datasource.common.username=root
+#quarkus.datasource.common.password=Stoneage&8
+#quarkus.datasource.common.jdbc.url=jdbc:mysql://localhost:3306/common_utils?rewriteBatchedStatements=true&useSSL=false&allowPublicKeyRetrieval=true
+
+# UAT
+quarkus.datasource.common.username=root
+quarkus.datasource.common.password=St0ne@ge@202#
+quarkus.datasource.common.jdbc.url=jdbc:mysql://localhost:3306/common_utils?rewriteBatchedStatements=true&useSSL=false&allowPublicKeyRetrieval=true
+
+
+#MarketWatch Database properties
+quarkus.datasource.mw.db-kind=mysql
+quarkus.hibernate-orm.mw.database.generation=none
+quarkus.hibernate-orm.mw.datasource=mw
+quarkus.datasource.mw.jdbc.max-size=50
+quarkus.datasource.mw.jdbc.min-size=1
+quarkus.hibernate-orm.mw.physical-naming-strategy=org.springframework.boot.orm.jpa.hibernate.SpringPhysicalNamingStrategy
+quarkus.hibernate-orm.mw.implicit-naming-strategy=org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+quarkus.hibernate-orm.mw.packages=in.codifi.admin.entity.mw
+
+#Local
+#quarkus.datasource.mw.username=root
+#quarkus.datasource.mw.password=Stoneage&8
+#quarkus.datasource.mw.jdbc.url=jdbc:mysql://localhost:3306/marketwatch?rewriteBatchedStatements=true&useSSL=false&allowPublicKeyRetrieval=true 
+
+# UAT
+quarkus.datasource.mw.username=root
+quarkus.datasource.mw.password=St0ne@ge@202#
+quarkus.datasource.mw.jdbc.url=jdbc:mysql://localhost:3306/marketwatch?rewriteBatchedStatements=true&useSSL=false&allowPublicKeyRetrieval=true
+
+#pushnotification properties
+appconfig.push.fcmbaseurl=https://fcm.googleapis.com/fcm/send
+appconfig.push.fcm.apikey=AAAAKa2mHKY:APA91bGz42VyfN1MHX00ERgN_yw7M9Mzwqp7xzH7Sn6b7aw8hCf8YFxSe4AkQHKS77dm5u7J0xpsJsRrBDe8Y-BqLPdx7yv1ozn309Y2ASoCielgJ-PqUHKIAkM-_MrIzXlC7frww0zm
+
+#Application Properties
+appconfig.client.file.path=/opt/data/client/
+appconfig.client.file.completedpath=/opt/data/client/completed/
+appconfig.client.file.resultpath=/opt/data/client/result/
+
+appconfig.position.file.path=/opt/data/position/
+appconfig.position.file.completedpath=/opt/data/position/completed/
+appconfig.holdings.file.path=/opt/data/holdings/
+appconfig.holdings.file.completedpath=/opt/data/holdings/completed/
+
+auth.org.server.cleint.chola.id=68be012a-c62a-481f-aa06-6388fab4a0f0
+auth.org.server.role.active.id=594260ba-d6ca-40b3-84e2-8ebdc93e858c
+auth.org.server.role.active.name=ACTIVE_USER
+auth.org.server.role.dormant.id=35ab3444-2924-4fcc-9965-5a98f1e88bcc
+auth.org.server.role.dormant.name=DORMANT_USER
+
+# Logger configurations
+quarkus.log.level=ERROR
+quarkus.log.category."org.hibernate".level=ERROR
+quarkus.log.category."io.qu".level=ERROR
+quarkus.log.category."io.quarkus".level=ERROR
+quarkus.log.category."org.springframework".level=ERROR
+quarkus.log.category."in.codifi".level=ALL
+quarkus.log.console.json=false
+quarkus.log.console.json.pretty-print=false
+quarkus.log.console.format=%d{HH:mm:ss} %-5p [%c{2.}] (%t) %s%e%n
+quarkus.log.file.enable=true
+quarkus.log.file.path=/tmp/Admin.log
+quarkus.log.file.level=ALL
+quarkus.log.file.format=%d{yyyy-MM-dd HH:mm:ss,SSS} %h %N[%i] %-5p [%c{3.}] (%t) %s%e%n
+quarkus.log.file.rotation.max-file-size=1M
+quarkus.log.file.rotation.max-backup-index=100
+
+# Open API & Swagger UI Configurations
+quarkus.smallrye-openapi.path=/swagger
+quarkus.swagger-ui.always-include=true
+
+# Open API & Swagger application info
+quarkus.smallrye-openapi.info-title=Admin API
+%dev.quarkus.smallrye-openapi.info-title=Admin API (development)
+%test.quarkus.smallrye-openapi.info-title=Admin API (test)
+quarkus.smallrye-openapi.info-version=0.0.1
+quarkus.smallrye-openapi.info-description=Admin service for a particular user
+quarkus.smallrye-openapi.info-terms-of-service=For Terms & Conditions, Refer https://codifi.in/tnc
+quarkus.smallrye-openapi.info-contact-email=techsupport@codifi.in
+quarkus.smallrye-openapi.info-contact-name=Tech Support
+quarkus.smallrye-openapi.info-contact-url=https://codifi.in/support
+quarkus.smallrye-openapi.info-license-name=https://codifi.in/license/codifi
+quarkus.smallrye-openapi.info-license-url=https://codifi.in/license

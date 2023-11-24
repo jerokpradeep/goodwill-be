@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<launchConfiguration type="org.jboss.tools.quarkus.core.launchConfigurationType">
+    <booleanAttribute key="org.eclipse.debug.core.ATTR_FORCE_SYSTEM_CONSOLE_ENCODING" value="false"/>
+    <stringAttribute key="org.eclipse.jdt.launching.PROJECT_ATTR" value="SSO-AUTH-MODULE"/>
+    <stringAttribute key="org.jboss.tools.quarkus.core.profileName" value="quarkus dev"/>
+</launchConfiguration>

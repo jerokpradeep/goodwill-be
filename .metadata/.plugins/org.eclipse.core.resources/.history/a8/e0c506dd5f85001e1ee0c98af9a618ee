@@ -1,0 +1,123 @@
+quarkus.http.port=9004
+quarkus.package.type=uber-jar
+
+# Keycloak configuration
+quarkus.oidc.auth-server-url=https://idaas.gwcindia.in/idaas/realms/goodwill
+quarkus.oidc.client-id=goodwill
+quarkus.oidc.authentication.user-info-required=true
+quarkus.http.auth.permission.authenticated.paths=/*
+quarkus.http.auth.permission.authenticated.policy=authenticated
+quarkus.http.auth.permission.permit1.paths=/q/metrics*
+quarkus.http.auth.permission.permit1.policy=permit
+quarkus.keycloak.policy-enforcer.enable=false
+quarkus.oauth2.introspection-url=https://idaas.gwcindia.in/idaas/realms/goodwill/protocol/openid-connect/token/introspect
+
+#Application Properties
+config.app.hazel.cluster=dev
+config.app.hazel.address=127.0.0.1:5701
+
+#Primary Database properties
+quarkus.datasource.db-kind=mysql
+quarkus.datasource.jdbc.max-size=200
+quarkus.datasource.jdbc.min-size=1
+quarkus.hibernate-orm.database.generation=none
+quarkus.hibernate-orm.dialect=org.hibernate.dialect.MySQL8Dialect
+quarkus.hibernate-orm.physical-naming-strategy=org.springframework.boot.orm.jpa.hibernate.SpringPhysicalNamingStrategy
+quarkus.hibernate-orm.implicit-naming-strategy=org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+quarkus.hibernate-orm.packages=in.codifi.funds.entity.primary
+ 
+#Local
+quarkus.datasource.username=root
+quarkus.datasource.password=Stoneage&8
+quarkus.datasource.jdbc.url=jdbc:mysql://127.0.0.1:3306/goodwill?rewriteBatchedStatements=true&useSSL=false&allowPublicKeyRetrieval=true
+# UAT
+#quarkus.datasource.username=root
+#quarkus.datasource.password=St0ne@ge@202#
+#quarkus.datasource.jdbc.url=jdbc:mysql://127.0.0.1:3306/goodwill?rewriteBatchedStatements=true&useSSL=false&allowPublicKeyRetrieval=true
+
+
+#Logs Database properties
+quarkus.datasource.logs.db-kind=mysql
+quarkus.hibernate-orm.logs.database.generation=update
+quarkus.hibernate-orm.logs.datasource=logs
+quarkus.datasource.logs.jdbc.max-size=200
+quarkus.datasource.logs.jdbc.min-size=1
+quarkus.hibernate-orm.logs.physical-naming-strategy=org.springframework.boot.orm.jpa.hibernate.SpringPhysicalNamingStrategy
+quarkus.hibernate-orm.logs.implicit-naming-strategy=org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+quarkus.hibernate-orm.logs.packages=in.codifi.funds.entity.logs
+
+#Local
+quarkus.datasource.logs.username=root
+quarkus.datasource.logs.password=Stoneage&8
+quarkus.datasource.logs.jdbc.url=jdbc:mysql://127.0.0.1:3306/logs_db?rewriteBatchedStatements=true&useSSL=false&allowPublicKeyRetrieval=true
+# UAT
+#quarkus.datasource.logs.username=root
+#quarkus.datasource.logs.password=St0ne@ge@202#
+#quarkus.datasource.logs.jdbc.url=jdbc:mysql://127.0.0.1:3306/logs_db?rewriteBatchedStatements=true&useSSL=false&allowPublicKeyRetrieval=true
+
+#Payments properties
+appconfig.razorpay.ifsc.url=https://ifsc.razorpay.com/
+#UAT
+appconfig.razorpay.key=rzp_live_HLA2cXFCZsd88u
+appconfig.razorpay.secret=hJo62pNM5vMfXt4puCZ4KAZO
+
+#Live
+#appconfig.razorpay.key=rzp_live_GTKiHFOH2kpmbX
+#appconfig.razorpay.secret=SbF7EY0EfkLUUfTeV3B6SGwN
+
+appconfig.mail.recipient.ids=dinesh@codifi.in,sivaselvan@codifi.in
+
+#kambala config
+
+#UAT
+#appconfig.kambala.url.base=https://10.10.0.165/NorenWClientTP/
+#LIVE
+#appconfig.kambala.url.base=https://giga.gwcindia.in/NorenWClientTP/
+#Local
+appconfig.kambala.url.base=https://49.207.182.3/NorenWClientTP/
+
+appconfig.kambala.url.limits=${appconfig.kambala.url.base}Limits
+appconfig.kambala.url.payment.gethstoken=${appconfig.kambala.url.base}GetHsToken
+
+
+#backoffice payin login
+appconfig.backoff.login=https://backoffice.gwcindia.in:7443/techexcelapi/index.cfm/main/doLogin?&UrlUserName=codify&UrlPassword=C0d1fy@2o23&UrlDatabase=capsfo&UrlDataYear=2023
+appconfig.backoff.bank.details=https://backoffice.gwcindia.in:7443/techexcelapi/index.cfm/ClientBankDetailMultiple/ClientBankDetailMultiple1?&Client_id=
+appconfig.url.backoffice.login=https://backoffice.gwcindia.in:7443/techexcelapi/index.cfm/main/doLogin?&UrlUserName=codify&UrlPassword=C0d1fy@2o23&UrlDatabase=capsfo&UrlDataYear=2023
+appconfig.url.backoffice.checkmargin=https://backoffice.gwcindia.in:7443/techexcelapi/index.cfm/ViewBalance/ViewBalance?&Company_Code=GRP1&Client_ID=
+appconfig.url.backoffice.payout=https://backoffice.gwcindia.in:7443/techexcelapi/index.cfm/payment/AddPayment?&AccountCode=
+appconfig.url.backoffice.payin=https://backoffice.gwcindia.in:7443/techexcelapi/index.cfm/ReceiptNormal/ReceiptNormal?
+
+# Logger configurations
+quarkus.log.level=ERROR
+quarkus.log.category."org.hibernate".level=ERROR
+quarkus.log.category."io.qu".level=ERROR
+quarkus.log.category."io.quarkus".level=ERROR
+quarkus.log.category."org.springframework".level=ERROR
+quarkus.log.category."in.codifi".level=ALL
+quarkus.log.console.json=false
+quarkus.log.console.json.pretty-print=false
+quarkus.log.console.format=%d{HH:mm:ss} %-5p [%c{2.}] (%t) %s%e%n
+quarkus.log.file.enable=true
+quarkus.log.file.path=/tmp/limits.log
+quarkus.log.file.level=ALL
+quarkus.log.file.format=%d{yyyy-MM-dd HH:mm:ss,SSS} %h %N[%i] %-5p [%c{3.}] (%t) %s%e%n
+quarkus.log.file.rotation.max-file-size=1M
+quarkus.log.file.rotation.max-backup-index=100
+
+# Open API & Swagger UI Configurations
+quarkus.smallrye-openapi.path=/swagger
+quarkus.swagger-ui.always-include=true
+
+# Open API & Swagger application info
+quarkus.smallrye-openapi.info-title=Funds API
+%dev.quarkus.smallrye-openapi.info-title=Funds API (development)
+%test.quarkus.smallrye-openapi.info-title=Funds API (test)
+quarkus.smallrye-openapi.info-version=0.0.1
+quarkus.smallrye-openapi.info-description=Funds service for a particular user
+quarkus.smallrye-openapi.info-terms-of-service=For Terms & Conditions, Refer https://codifi.in/tnc
+quarkus.smallrye-openapi.info-contact-email=techsupport@codifi.in
+quarkus.smallrye-openapi.info-contact-name=Tech Support
+quarkus.smallrye-openapi.info-contact-url=https://codifi.in/support
+quarkus.smallrye-openapi.info-license-name=https://codifi.in/license/codifi
+quarkus.smallrye-openapi.info-license-url=https://codifi.in/license

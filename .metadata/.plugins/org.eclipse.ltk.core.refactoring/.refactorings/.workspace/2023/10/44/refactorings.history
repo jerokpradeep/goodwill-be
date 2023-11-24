@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Delete resource &apos;ekyc-admin-module&apos;" deleteContents="false" description="Delete resource &apos;ekyc-admin-module&apos;" element1="/ekyc-admin-module" flags="7" id="org.eclipse.ltk.core.refactoring.delete.resources" resources="1" stamp="1698647431438"/>
+</session>
