@@ -8,12 +8,16 @@ import org.jboss.resteasy.reactive.RestResponse;
 import in.codifi.auth.config.HazelcastConfig;
 import in.codifi.auth.model.response.GenericResponse;
 import in.codifi.auth.servcie.AuthService;
+import in.codifi.auth.utility.AppConstants;
+import in.codifi.auth.utility.PrepareResponse;
 
 @ApplicationScoped
 public class CacheService {
 
 	@Inject
 	AuthService authService;
+	@Inject
+	PrepareResponse prepareResponse;
 
 	/**
 	 * 
@@ -40,6 +44,36 @@ public class CacheService {
 	 */
 	public RestResponse<GenericResponse> reload2FACache() {
 		return authService.loadTwoFAUserPreference();
+	}
+
+	/**
+	 * 
+	 * Method to clear all kambala rest session
+	 * 
+	 * @author Dinesh Kumar
+	 *
+	 * @return
+	 */
+	public RestResponse<GenericResponse> clearAllRestSession() {
+		HazelcastConfig.getInstance().getRestUserSession().clear();
+		HazelcastConfig.getInstance().getIsRestUserSessionActive().clear();
+		HazelcastConfig.getInstance().getUserSessionDetails().clear();
+		return prepareResponse.prepareSuccessMessage(AppConstants.SUCCESS_STATUS);
+	}
+
+	/**
+	 * 
+	 * Method to clear user kambala rest session
+	 * 
+	 * @author Dinesh Kumar
+	 *
+	 * @param userId
+	 * @return
+	 */
+	public RestResponse<GenericResponse> clearRestSessionById(String userId) {
+		HazelcastConfig.getInstance().getRestUserSession().remove(userId + AppConstants.HAZEL_KEY_REST_SESSION);
+		HazelcastConfig.getInstance().getIsRestUserSessionActive().remove(userId + AppConstants.HAZEL_KEY_REST_SESSION);
+		return prepareResponse.prepareSuccessMessage(AppConstants.SUCCESS_STATUS);
 	}
 
 }

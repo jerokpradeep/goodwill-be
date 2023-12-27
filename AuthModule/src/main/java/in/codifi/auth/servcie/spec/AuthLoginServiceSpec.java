@@ -8,14 +8,14 @@ import in.codifi.cache.model.ClinetInfoModel;
 
 public interface AuthLoginServiceSpec {
 
-	/**
-	 * method to quick auth login
-	 * 
-	 * @author SowmiyaThangaraj
-	 * @param authmodel
-	 * @return
-	 */
-	RestResponse<GenericResponse> quickAuthLogin(AuthReq authmodel);
+//	/**
+//	 * method to quick auth login
+//	 * 
+//	 * @author SowmiyaThangaraj
+//	 * @param authmodel
+//	 * @return
+//	 */
+//	RestResponse<GenericResponse> quickAuthLogin(AuthReq authmodel);
 
 	/**
 	 * method to send otp for 2fa
@@ -96,5 +96,14 @@ public interface AuthLoginServiceSpec {
 	 * @return
 	 */
 	RestResponse<GenericResponse> validatePasswordForBio(AuthReq authReq, String deviceIp);
+
+//	/**
+//	 * method to forgot password otp
+//	 * 
+//	 * @author SowmiyaThangaraj
+//	 * @param authmodel
+//	 * @return
+//	 */
+//	RestResponse<GenericResponse> forgotPwdotp(AuthReq authmodel);
 
 }

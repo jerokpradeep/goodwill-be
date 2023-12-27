@@ -5,6 +5,7 @@ import java.util.List;
 import javax.transaction.Transactional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -42,5 +43,16 @@ public interface PinStartBarRepository extends JpaRepository<PinStartBarEntity, 
 	 * @return
 	 */
 	List<PinStartBarEntity> findByUserIdAndSource(@Param("user_id") String userId, @Param("source") String source);
+
+	/**
+	 * method to delete expiry symbols
+	 * 
+	 * @author SowmiyaThangaraj
+	 * 
+	 */
+	@Transactional
+	@Modifying
+	@Query("DELETE FROM TBL_PIN_START_BAR WHERE expiry < CURDATE() AND id > 0")
+	void deletePinToStartBarWithoutExpiry();
 
 }

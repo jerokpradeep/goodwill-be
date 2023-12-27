@@ -1481,12 +1481,12 @@ public class AdvanceMWTestService implements AdvanceMWTestServiceSpec {
 	 * @author sowmiya
 	 */
 	@Override
-	public RestResponse<ResponseModel> sortMwScrips(MwRequestModel pDto, ClinetInfoModel info) {
+	public RestResponse<ResponseModel> sortMwScrips(MwRequestModel pDto, String userid) {
 		try {
-			if (StringUtil.isNotNullOrEmpty(info.getUserId()) && StringUtil.isListNotNullOrEmpty(pDto.getScripData())
+			if (StringUtil.isNotNullOrEmpty(userid) && StringUtil.isListNotNullOrEmpty(pDto.getScripData())
 					&& pDto.getMwId() > 0) {
-				sortFromCache(pDto.getScripData(), info.getUserId(), pDto.getMwId());
-				sortScripInDataBase(pDto.getScripData(), info.getUserId(), pDto.getMwId());
+				sortFromCache(pDto.getScripData(), userid, pDto.getMwId());
+				sortScripInDataBase(pDto.getScripData(), userid, pDto.getMwId());
 				return prepareResponse.prepareSuccessResponseObject(AppConstants.EMPTY_ARRAY);
 			} else {
 				return prepareResponse.prepareFailedResponse(AppConstants.INVALID_PARAMETER);

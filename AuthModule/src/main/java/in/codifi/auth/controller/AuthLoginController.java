@@ -11,6 +11,7 @@ import org.jboss.resteasy.reactive.RestResponse;
 import in.codifi.auth.controller.spec.AuthLoginControllerSpec;
 import in.codifi.auth.model.request.AuthReq;
 import in.codifi.auth.model.response.GenericResponse;
+import in.codifi.auth.servcie.spec.AuthLoginNewServiceSpec;
 import in.codifi.auth.servcie.spec.AuthLoginServiceSpec;
 import in.codifi.auth.utility.AppConstants;
 import in.codifi.auth.utility.AppUtils;
@@ -24,7 +25,8 @@ public class AuthLoginController implements AuthLoginControllerSpec {
 
 	@Context
 	ContainerRequestContext request;
-
+	@Inject
+	AuthLoginNewServiceSpec service;
 	@Inject
 	AuthLoginServiceSpec authService;
 	@Inject
@@ -32,18 +34,18 @@ public class AuthLoginController implements AuthLoginControllerSpec {
 	@Inject
 	AppUtils appUtil;
 
-	/**
-	 * method to quick auth login
-	 * 
-	 * @author SowmiyaThangaraj
-	 */
-	@Override
-	public RestResponse<GenericResponse> quickAuthLogin(AuthReq authmodel) {
-		if (authmodel == null) {
-			return prepareResponse.prepareFailedResponse(AppConstants.INVALID_PARAMETER);
-		}
-		return authService.quickAuthLogin(authmodel);
-	}
+//	/**
+//	 * method to quick auth login
+//	 * 
+//	 * @author SowmiyaThangaraj
+//	 */
+//	@Override
+//	public RestResponse<GenericResponse> quickAuthLogin(AuthReq authmodel) {
+//		if (authmodel == null) {
+//			return prepareResponse.prepareFailedResponse(AppConstants.INVALID_PARAMETER);
+//		}
+//		return authService.quickAuthLogin(authmodel);
+//	}
 
 	/**
 	 * method to send otp
@@ -150,5 +152,38 @@ public class AuthLoginController implements AuthLoginControllerSpec {
 		MultivaluedMap<String, String> headers = request.getHeaders();
 		String deviceIp = headers.getFirst(AppConstants.X_FORWARDED_FOR);
 		return authService.validatePasswordForBio(authReq, deviceIp);
+	}
+
+//	/**
+//	 * method to forgot password otp
+//	 * 
+//	 * @author SowmiyaThangaraj
+//	 */
+//	@Override
+//	public RestResponse<GenericResponse> forgotPwdotp(AuthReq authmodel) {
+//		return authService.forgotPwdotp(authmodel);
+//	}
+
+	/**
+	 * method to forgot password otp
+	 * 
+	 * @author SowmiyaThangaraj
+	 */
+	@Override
+	public RestResponse<GenericResponse> forgotPwdotp(AuthReq authmodel) {
+		return service.forgotPwdotp(authmodel);
+	}
+
+	/**
+	 * method to quick auth login
+	 * 
+	 * @author SowmiyaThangaraj
+	 */
+	@Override
+	public RestResponse<GenericResponse> quickAuthLogin(AuthReq authmodel) {
+		if (authmodel == null) {
+			return prepareResponse.prepareFailedResponse(AppConstants.INVALID_PARAMETER);
+		}
+		return service.quickAuthLogin(authmodel);
 	}
 }

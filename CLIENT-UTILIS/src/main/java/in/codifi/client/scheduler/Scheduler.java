@@ -29,7 +29,11 @@ public class Scheduler {
 		dataFeedService.loadStockData();
 		preferenceService.loadMasterPreference();
 		preferenceService.loadUserPreference();
-		pinStartBarService.loadPinToStartBar();
+	}
+
+	@Scheduled(cron = "0 30 5 * * ?")
+	public void deleteExpiredPinToStartBar(ScheduledExecution se) {
+		pinStartBarService.deleteExpiredPinToStartBar();
 
 	}
 

@@ -27,6 +27,7 @@ import in.codifi.auth.utility.CommonUtils;
 import in.codifi.auth.utility.PrepareResponse;
 import in.codifi.auth.utility.StringUtil;
 import in.codifi.ws.model.client.LogoutRestRespModel;
+import in.codifi.ws.model.kb.login.ForgotOTPRestRespModel;
 import in.codifi.ws.model.kb.login.ForgotPwdRestRespModel;
 import in.codifi.ws.model.kb.login.QuickAuthRespModel;
 import in.codifi.ws.model.kc.ChangePwdRestRespModel;
@@ -364,8 +365,8 @@ public class KambalaRestServices {
 	 * @param userId
 	 * @return
 	 */
-	public ForgotPwdRestRespModel forgotPwdOtp(String request, String userId) {
-		ForgotPwdRestRespModel respModel = new ForgotPwdRestRespModel();
+	public ForgotOTPRestRespModel forgotPwdOtp(String request, String userId) {
+		ForgotOTPRestRespModel respModel = new ForgotOTPRestRespModel();
 		try {
 			Log.info("Kambal forgot pwd otp req - " + request);
 			AppUtils.trustedManagement();
@@ -399,7 +400,7 @@ public class KambalaRestServices {
 				insertRestAccessLogs(accessLogModel);
 				if (StringUtil.isNotNullOrEmpty(output)) {
 					Log.info("Kambal forgot pwd Resp - " + output);
-					respModel = mapper.readValue(output, ForgotPwdRestRespModel.class);
+					respModel = mapper.readValue(output, ForgotOTPRestRespModel.class);
 				}
 			} else {
 				System.out.println("Error Connection in forgot pwd api. Response code -" + responseCode);
@@ -409,7 +410,7 @@ public class KambalaRestServices {
 				insertRestAccessLogs(accessLogModel);
 				if (StringUtil.isNotNullOrEmpty(output)) {
 					Log.info("Kambal forgot pwd Resp - " + output);
-					respModel = mapper.readValue(output, ForgotPwdRestRespModel.class);
+					respModel = mapper.readValue(output, ForgotOTPRestRespModel.class);
 				}
 			}
 		} catch (Exception e) {

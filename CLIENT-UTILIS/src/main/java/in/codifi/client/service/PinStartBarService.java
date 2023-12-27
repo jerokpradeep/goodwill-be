@@ -21,6 +21,7 @@ import in.codifi.client.service.spec.IPinStartBarService;
 import in.codifi.client.utilis.AppConstants;
 import in.codifi.client.utilis.PrepareResponse;
 import in.codifi.client.utilis.StringUtil;
+import io.quarkus.logging.Log;
 
 @ApplicationScoped
 public class PinStartBarService implements IPinStartBarService {
@@ -120,33 +121,108 @@ public class PinStartBarService implements IPinStartBarService {
 		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
 	}
 
-	/**
-	 * method to get pin to start bar for mobile
-	 * 
-	 * @author SOWMIYA
-	 * @return
-	 */
+//	/**
+//	 * method to get pin to start bar for mobile
+//	 * 
+//	 * @author SOWMIYA
+//	 * @return
+//	 */
+//	public RestResponse<GenericResponse> getPinToStartBarForMob(ClinetInfoModel info) {
+//		try {
+//			List<PinStartBarEntity> pintostartbar = HazelcastConfig.getInstance().getPinTostartbar()
+//					.get(info.getUserId() + "_" + AppConstants.SOURCE_MOB);
+//
+//			if (StringUtil.isListNotNullOrEmpty(pintostartbar))
+//				return prepareResponse.prepareSuccessResponseObject(pintostartbar);
+//
+//			pintostartbar = pinStartBarRepository.findByUserIdAndSource(info.getUserId(), AppConstants.SOURCE_MOB);
+//			if (StringUtil.isListNotNullOrEmpty(pintostartbar)) {
+//				HazelcastConfig.getInstance().getPinTostartbar().put(info.getUserId() + "_" + AppConstants.SOURCE_MOB,
+//						pintostartbar);
+//			} else {
+//				/** to load default value **/
+//				pintostartbar = loadDeafultStartBar(info.getUserId(), AppConstants.SOURCE_MOB);
+//			}
+//			return prepareResponse.prepareSuccessResponseObject(pintostartbar);
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//		}
+//		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+//
+//	}
 	public RestResponse<GenericResponse> getPinToStartBarForMob(ClinetInfoModel info) {
 		try {
-			List<PinStartBarEntity> pintostartbar = HazelcastConfig.getInstance().getPinTostartbar()
-					.get(info.getUserId() + "_" + AppConstants.SOURCE_MOB);
-
-			if (StringUtil.isListNotNullOrEmpty(pintostartbar))
-				return prepareResponse.prepareSuccessResponseObject(pintostartbar);
-
-			pintostartbar = pinStartBarRepository.findByUserIdAndSource(info.getUserId(), AppConstants.SOURCE_MOB);
-			if (StringUtil.isListNotNullOrEmpty(pintostartbar)) {
-				HazelcastConfig.getInstance().getPinTostartbar().put(info.getUserId() + "_" + AppConstants.SOURCE_MOB,
-						pintostartbar);
+			List<PinStartBarEntity> pinStartBarEntity = pinStartBarRepository.findByUserIdAndSource(info.getUserId(),
+					AppConstants.SOURCE_MOB);
+			if (pinStartBarEntity != null && pinStartBarEntity.size() > 1) {
+				return prepareResponse.prepareSuccessResponseObject(pinStartBarEntity);
+			} else if (pinStartBarEntity != null && pinStartBarEntity.size() > 0) {
+				List<PinStartBarMappingEntity> mappingEntities = mappingRepository.findAll();
+				PinStartBarEntity pinToStart = pinStartBarEntity.get(0);
+				PinStartBarMappingEntity notExistingEntity = null;
+				if (mappingEntities != null && mappingEntities.size() > 0) {
+					for (PinStartBarMappingEntity entity : mappingEntities) {
+						if (entity.getExchange().equalsIgnoreCase(pinToStart.getExchange())
+								&& entity.getToken().equalsIgnoreCase(pinToStart.getToken())) {
+							continue;
+						} else {
+							notExistingEntity = new PinStartBarMappingEntity();
+							notExistingEntity = entity;
+							break;
+						}
+					}
+					if (notExistingEntity != null) {
+						List<PinStartBarEntity> finalEntity = addPinToStartBar(notExistingEntity, info.getUserId(),
+								pinToStart.getSortOrder(), pinStartBarEntity);
+						if (finalEntity != null && finalEntity.size() > 0) {
+							return prepareResponse.prepareSuccessResponseObject(finalEntity);
+						}
+					}
+				}
 			} else {
 				/** to load default value **/
-				pintostartbar = loadDeafultStartBar(info.getUserId(), AppConstants.SOURCE_MOB);
+				pinStartBarEntity = loadDeafultStartBar(info.getUserId(), AppConstants.SOURCE_MOB);
 			}
-			return prepareResponse.prepareSuccessResponseObject(pintostartbar);
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			Log.error("pinToStartBarExpired", e);
+		}
+		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+	}
+
+	/**
+	 * method to add
+	 * 
+	 * @param entity
+	 * @param sortOrder
+	 * @param pinStartBarEntity
+	 */
+	private List<PinStartBarEntity> addPinToStartBar(PinStartBarMappingEntity entity, String userId, int sortOrder,
+			List<PinStartBarEntity> pinStartBarEntity) {
+
+		try {
+			PinStartBarEntity model = new PinStartBarEntity();
+			model.setToken(entity.getToken());
+			model.setExchange(entity.getExchange());
+			model.setSymbol(entity.getSymbol());
+			model.setFormattedInsName(entity.getSymbol());
+			model.setTradingSymbol(entity.getSymbol());
+			if (sortOrder == 1) {
+				model.setSortOrder(2);
+			} else {
+				model.setSortOrder(1);
+			}
+			model.setUserId(userId);
+			model.setSegment(entity.getSegment());
+			model.setSource(AppConstants.SOURCE_MOB);
+			pinStartBarEntity.add(model);
+			pinStartBarRepository.save(model);
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+		return pinStartBarEntity;
 
 	}
 
@@ -317,5 +393,24 @@ public class PinStartBarService implements IPinStartBarService {
 		}
 		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
 	}
+
+	/**
+	 * method to delete expiry
+	 * 
+	 * @author SowmiyaThangaraj
+	 * @param info
+	 * @return
+	 */
+	public RestResponse<GenericResponse> deleteExpiredPinToStartBar() {
+		try {
+			pinStartBarRepository.deletePinToStartBarWithoutExpiry();
+			return prepareResponse.prepareSuccessMessage(AppConstants.EXPIRY_DELETED);
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+	}
+
 
 }

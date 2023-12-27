@@ -42,12 +42,27 @@ public class PrepareResponse {
 	 * @param errorMessage
 	 * @return
 	 */
-	public RestResponse<GenericResponse> prepareFailedResponseObject(Object resultData, String errorMessage) {
+	public RestResponse<GenericResponse> prepareFailedResponseObject(Object resultData) {
 
 		GenericResponse responseObject = new GenericResponse();
 		responseObject.setResult(resultData);
 		responseObject.setStatus(AppConstants.STATUS_NOT_OK);
-		responseObject.setMessage(errorMessage);
+//		responseObject.setMessage(errorMessage);
+		return RestResponse.ResponseBuilder.create(Status.OK, responseObject).build();
+	}
+
+	/**
+	 * method to prepare failed response object
+	 * 
+	 * @ @param resultData
+	 * @param message
+	 * @return
+	 */
+	public RestResponse<GenericResponse> prepareFailedResponseObjectQuickAuth(Object resultData, String message) {
+		GenericResponse responseObject = new GenericResponse();
+		responseObject.setResult(getResult(resultData));
+		responseObject.setStatus(AppConstants.STATUS_NOT_OK);
+		responseObject.setMessage(message);
 		return RestResponse.ResponseBuilder.create(Status.OK, responseObject).build();
 	}
 
@@ -93,14 +108,29 @@ public class PrepareResponse {
 
 	/**
 	 * Common method to Success Response
+	 * 
+	 * @author SowmiyaThangaraj
+	 * @param resultData
+	 * @return
+	 */
+	public RestResponse<GenericResponse> prepareSuccessResponseObjectQuickAuth(Object resultData, String message) {
+		GenericResponse responseObject = new GenericResponse();
+		responseObject.setResult(getResult(resultData));
+		responseObject.setStatus(AppConstants.STATUS_OK);
+		responseObject.setMessage(message);
+		return RestResponse.ResponseBuilder.create(Status.OK, responseObject).build();
+	}
+
+	/**
+	 * Common method to Success Response
 	 *
 	 * @param resultData
 	 * @return
 	 */
-	public RestResponse<GenericResponse> prepareSuccessMessage(String message) {
+	public RestResponse<GenericResponse> prepareSuccessMessage(String isUpdated) {
 		GenericResponse responseObject = new GenericResponse();
 		responseObject.setStatus(AppConstants.STATUS_OK);
-		responseObject.setMessage(message);
+		responseObject.setMessage(isUpdated);
 		responseObject.setResult(AppConstants.EMPTY_ARRAY);
 		return RestResponse.ResponseBuilder.create(Status.OK, responseObject).build();
 	}

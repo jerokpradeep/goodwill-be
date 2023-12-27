@@ -57,6 +57,7 @@ public interface AdvanceMWTestServiceSpec {
 	 * @param info
 	 * @return
 	 */
-	RestResponse<ResponseModel> sortMwScrips(MwRequestModel pDto, ClinetInfoModel info);
+//	RestResponse<ResponseModel> sortMwScrips(MwRequestModel pDto, ClinetInfoModel info);
+	RestResponse<ResponseModel> sortMwScrips(MwRequestModel pDto, String userid);
 
 }

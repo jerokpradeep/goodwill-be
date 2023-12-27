@@ -114,6 +114,10 @@ public class PaymentController implements PaymentControllerSpec {
 	 */
 	public RestResponse<GenericResponse> verifyPayments(VerifyPaymentReqModel model) {
 		ClinetInfoModel info = appUtil.getClientInfo();
+//		ClinetInfoModel info = new ClinetInfoModel();
+//		info.setUcc("GC110180");
+//		info.setUserId("GC110180");
+//		ClientInfoModel info = new ClientInfoModel();
 		if (info == null || StringUtil.isNullOrEmpty(info.getUserId())) {
 			Log.error("Client info is null");
 			return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);

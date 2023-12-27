@@ -64,6 +64,7 @@ public class HazelcastConfig {
 
 	IMap<String, String> resendOtp = getHz().getMap("resendOtp"); // Expire - 30 seconds
 	IMap<String, String> otp = getHz().getMap("otp"); // Expire - 5 minutes
+	IMap<String, String> password = getHz().getMap("password"); // Expire - 5 minutes
 	IMap<String, Integer> retryOtpCount = getHz().getMap("otp");
 	IMap<String, Boolean> holdResendOtp = getHz().getMap("otp");
 	private Map<String, Long> apiRequestCount = getHz().getMap("apiRequestCount");

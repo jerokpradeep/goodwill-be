@@ -15,4 +15,5 @@ public class AuthRespModel {
 	private String redirectUrl;
 	private String clientId;
 	private boolean isAuthorized;
+	private int isUpdate;
 }

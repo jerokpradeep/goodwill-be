@@ -21,6 +21,8 @@ public class EmailUtils {
 
 	@Inject
 	EmailProperties props;
+	@Inject
+	AppUtil appUtils;
 
 	/**
 	 * 
@@ -57,21 +59,25 @@ public class EmailUtils {
 			public void run() {
 				try {
 					List<String> recpient = Arrays.asList(props.getRecipientIds().split(","));
-					String subject = "";
-					String htmlBody = "<!DOCTYPE html><html><head><style>*{font-family:'Open Sans',"
-							+ " Helvetica, Arial;color: #1e3465}table {margin-left:100px;font-family: arial, sans-serif;border-collapse:"
-							+ " separate;}td, th {border: 1px solid #1e3465;text-align: left;padding: 8px;}"
-							+ "th{background :#1e3465;color:white;}</style></head><body><div>"
-							+ "<div  style='font-size:14px'><p>Hi  ,</p><p>" + message + " </p></div>"
-							+ "<div><p align='left'>" + "<b>Regards,"
-							+ "<br>Goodwill.</b></p></div></div></body></html>";
-					if (message.startsWith(" Payout for user ")) {
-						subject = AppConstants.PAYOUT_SUBJECT;
+					for (String emailId : recpient) {
+						if (appUtils.isEmail(emailId)) {
+							String subject = "";
+							String body = "<!DOCTYPE html><html><head><style>*{font-family:'Open Sans',"
+									+ " Helvetica, Arial;color: #1e3465}table {margin-left:100px;font-family: arial, sans-serif;border-collapse:"
+									+ " separate;}td, th {border: 1px solid #1e3465;text-align: left;padding: 8px;}"
+									+ "th{background :#1e3465;color:white;}</style></head><body><div>"
+									+ "<div  style='font-size:14px'><p>Hi  ,</p><p>" + message + " </p></div>"
+									+ "<div><p align='left'>" + "<b>Regards,"
+									+ "<br>Goodwill.</b></p></div></div></body></html>";
 
-					} else if (message.startsWith(" Payment of user ")) {
-						subject = AppConstants.PAYMENT_SUBJECT;
+							subject = AppConstants.PAYMENT_SUBJECT;
+							Mail mail = Mail.withHtml(emailId, subject, body);
+
+							mailer.send(mail);
+						} else {
+							Log.error("userId :" + emailId + "is mailId is null");
+						}
 					}
-					sendEmailWithZoho(htmlBody, subject, recpient);
 				} catch (Exception e) {
 					e.printStackTrace();
 					Log.error(e.getMessage());

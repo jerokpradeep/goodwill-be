@@ -11,24 +11,23 @@ import org.jboss.resteasy.reactive.RestResponse;
 
 import in.codifi.auth.model.request.AuthReq;
 import in.codifi.auth.model.response.GenericResponse;
-import in.codifi.cache.model.ClinetInfoModel;
 
 public interface AuthLoginControllerSpec {
 
-	/**
-	 * 
-	 * Method to check user exist or not
-	 * 
-	 * @author sowmiya
-	 *
-	 * @param authmodel
-	 * @return
-	 */
-	@Path("/login")
-	@POST
-	@Consumes(MediaType.APPLICATION_JSON)
-	@Produces(MediaType.APPLICATION_JSON)
-	RestResponse<GenericResponse> quickAuthLogin(AuthReq authmodel);
+//	/**
+//	 * 
+//	 * Method to check user exist or not
+//	 * 
+//	 * @author sowmiya
+//	 *
+//	 * @param authmodel
+//	 * @return
+//	 */
+//	@Path("/login")
+//	@POST
+//	@Consumes(MediaType.APPLICATION_JSON)
+//	@Produces(MediaType.APPLICATION_JSON)
+//	RestResponse<GenericResponse> quickAuthLogin(AuthReq authmodel);
 
 	/**
 	 * 
@@ -39,7 +38,7 @@ public interface AuthLoginControllerSpec {
 	 * @param authmodel
 	 * @return
 	 */
-	@Path("/otp/send")
+	@Path("/otp/send2FA")
 	@POST
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
@@ -54,7 +53,7 @@ public interface AuthLoginControllerSpec {
 	 * @param authmodel
 	 * @return
 	 */
-	@Path("/otp/validate")
+	@Path("/otp/validate2FA")
 	@POST
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
@@ -70,6 +69,17 @@ public interface AuthLoginControllerSpec {
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	RestResponse<GenericResponse> forgotPwd(AuthReq authmodel);
+
+//	/**
+//	 * method to forgot password
+//	 * 
+//	 * @author SowmiyaThangaraj
+//	 */
+//	@Path("/forgot/pwd/otp")
+//	@POST
+//	@Consumes(MediaType.APPLICATION_JSON)
+//	@Produces(MediaType.APPLICATION_JSON)
+//	RestResponse<GenericResponse> forgotPwdotp(AuthReq authmodel);
 
 	/**
 	 * method to unblock users
@@ -145,5 +155,27 @@ public interface AuthLoginControllerSpec {
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	RestResponse<GenericResponse> validatePasswordForBio(AuthReq authReq);
+
+	/**
+	 * method to forgot password otp
+	 * 
+	 * @author SowmiyaThangaraj
+	 */
+	@Path("/otp/send")
+	@POST
+	@Consumes(MediaType.APPLICATION_JSON)
+	@Produces(MediaType.APPLICATION_JSON)
+	RestResponse<GenericResponse> forgotPwdotp(AuthReq authmodel);
+
+	/**
+	 * method to quick auth login
+	 * 
+	 * @author SowmiyaThangaraj
+	 */
+	@Path("/otp/validate")
+	@POST
+	@Consumes(MediaType.APPLICATION_JSON)
+	@Produces(MediaType.APPLICATION_JSON)
+	RestResponse<GenericResponse> quickAuthLogin(AuthReq authmodel);
 
 }

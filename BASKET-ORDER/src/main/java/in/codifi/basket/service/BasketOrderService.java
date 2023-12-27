@@ -567,25 +567,22 @@ public class BasketOrderService implements IBasketOrderService {
 			if (request == null || request.size() <= 0)
 				return prepareResponse.prepareFailedResponseForList(AppConstants.FAILED_STATUS);
 
-			ObjectMapper mapper = new ObjectMapper();
-			try {
-				Log.info("Place order req in basket order -" + mapper.writeValueAsString(request));
-			} catch (JsonProcessingException e1) {
-				e1.printStackTrace();
-			}
 			List<GenericResponse> res = internalRestService.executeOrders(request, token);
-			if (res != null) {
+			try {
+				ObjectMapper mapper = new ObjectMapper();
+				String orderResp = mapper.writeValueAsString(res);
+				Log.info("executeOrderResponse" + orderResp);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 
-				String resp = "";
-				try {
-					resp = mapper.writeValueAsString(res.get(0).getResult());
-				} catch (JsonProcessingException e) {
-					e.printStackTrace();
-				}
-				Log.info("Place order res in basket order -" + resp);
-				basketOrderRepository.updateExecutionStatus("1", info.getUserId(), info.getUserId(),
+			if (res != null) {
+				Log.info("updateExecutionStatus" + res);
+				long isUpdate = basketOrderRepository.updateExecutionStatus("1", info.getUserId(), info.getUserId(),
 						executeBasketOrderReq.getBasketId());
-				return prepareResponse.prepareSuccessMessageForList(AppConstants.BASKET_EXECUTED);
+				Log.info("isUpdate" + isUpdate);
+				if (isUpdate > 0)
+					return prepareResponse.prepareSuccessMessageForList(AppConstants.BASKET_EXECUTED);
 			}
 
 		} catch (ClientWebApplicationException e) {
@@ -1299,5 +1296,21 @@ public class BasketOrderService implements IBasketOrderService {
 			Log.error("prepareRequest", e);
 		}
 		return request;
+	}
+
+	/**
+	 * method to update testing
+	 * 
+	 * @author SowmiyaThangaraj
+	 * 
+	 * @return
+	 */
+	public RestResponse<GenericResponse> updateTesting() {
+		long isUpdate = basketOrderRepository.updateExecutionStatus("1", "GC110180", "GC110180", 11);
+		if (isUpdate > 0) {
+			return prepareResponse.prepareSuccessMessage(AppConstants.SUCCESS_STATUS);
+		}
+		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+
 	}
 }

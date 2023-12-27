@@ -87,8 +87,8 @@ public class AppConstants {
 	public static final String CANNOT_GET_BANK_DETAILS = "Cannot get bank details";
 
 	// ** Email **//
-	public static final String PAYOUT_SUBJECT = "Pay out Failure : AliceBlue";
-	public static final String PAYMENT_SUBJECT = "Pay In Failure : AliceBlue";
+	public static final String PAYOUT_SUBJECT = "Pay out Failure : GoodWill";
+	public static final String PAYMENT_SUBJECT = "Payment Failure : GoodWill";
 
 	// ** RAZORPAY **//
 	public static final String RAZORPAY_NOTES = "notes";
