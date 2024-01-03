@@ -13,7 +13,6 @@ import java.util.Map;
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 
-import org.jboss.resteasy.reactive.RestResponse;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
@@ -22,11 +21,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import in.codifi.funds.config.RestServiceProperties;
 import in.codifi.funds.entity.primary.BOPaymentLogEntity;
+import in.codifi.funds.entity.primary.BoPayInLogsEntity;
 import in.codifi.funds.entity.primary.PaymentLogsEntity;
-import in.codifi.funds.model.response.GenericResponse;
+import in.codifi.funds.repository.BOPayInLogsRepository;
 import in.codifi.funds.repository.BOPaymentLogRepository;
 import in.codifi.funds.repository.PaymentLogsRepository;
 import in.codifi.funds.utility.AppConstants;
+import in.codifi.funds.utility.EmailUtils;
 import in.codifi.funds.utility.PrepareResponse;
 import io.quarkus.logging.Log;
 
@@ -40,6 +41,10 @@ public class BackOfficeRestService {
 	PaymentLogsRepository paymentLogRepo;
 	@Inject
 	BOPaymentLogRepository boPaymentLogRepository;
+	@Inject
+	EmailUtils emailUtils;
+	@Inject
+	BOPayInLogsRepository boPayInLogsRepository;
 
 	public Object loginBackOffice(String userId, int retryCount) {
 		Object object = new Object();
@@ -134,9 +139,12 @@ public class BackOfficeRestService {
 	 * @author SOWMIYA
 	 *
 	 */
-	public JSONArray boPayIn(String userId, String exchSegment, String orderId, double amount, String bnkAccNum,
+	public Object boPayIn(String userId, String exchSegment, String orderId, double amount, String bnkAccNum,
 			List<String> cookie, String paymentId, String paymentMethod, int retryCount) {
-		JSONArray response = new JSONArray();
+		Object responseObject = new JSONObject();
+		String errorMessage = "";
+		String originalResponse = "";
+		URL url = null;
 		// int retryCount = 0;
 		try {
 			String voucherDate = new SimpleDateFormat("dd/MM/yyyy").format(new Date());
@@ -156,9 +164,9 @@ public class BackOfficeRestService {
 			String actualTime = "";
 			String mode = "";
 			String refno = paymentId;
-			URL url = new URL(props.getBoPayIn() + "VoucherDate=" + voucherDate + "&AccountCode=" + userId
-					+ "&COMPANYCODE=" + companyCode + "&PAYMENTREFERENCENUMBER=" + paymentReferenceNumber + "&Amount="
-					+ amount + "&PostingBankAccount=" + postingBankAccount + "&BankAccountNumber=" + bankAccountNumber
+			url = new URL(props.getBoPayIn() + "VoucherDate=" + voucherDate + "&AccountCode=" + userId + "&COMPANYCODE="
+					+ companyCode + "&PAYMENTREFERENCENUMBER=" + paymentReferenceNumber + "&Amount=" + amount
+					+ "&PostingBankAccount=" + postingBankAccount + "&BankAccountNumber=" + bankAccountNumber
 					+ "&NARRATION=" + narration + "&ENTRYTYPE=" + entrytype + "&LiveExport=" + liveExport + "&RecoDate="
 					+ recodate + "&CHEQUE_CAN=" + cheque_can + "&Cheque_Image=" + cheque_image + "&Unautho_Flag="
 					+ unautho_flag + "&REFNO=" + refno + "&ActualTime=" + actualTime + "&Mode=" + mode);
@@ -180,6 +188,7 @@ public class BackOfficeRestService {
 			BufferedReader br1 = new BufferedReader(new InputStreamReader((conn.getInputStream())));
 			String output;
 			while ((output = br1.readLine()) != null) {
+				originalResponse = originalResponse + output;
 				Log.info("Back Ofiice -Pay In Res at -" + System.currentTimeMillis() + "Resp - " + output);
 				if (output.contains("Please Defiend DataYear")) {
 					retryCount++;
@@ -191,15 +200,29 @@ public class BackOfficeRestService {
 					}
 				} else {
 					Log.info(userId + " - Payin - " + output);
-					response = (JSONArray) JSONValue.parse(output);
+					responseObject = JSONValue.parse(output);
 				}
 			}
-			prepareBoPaymentLogs(orderId, userId, url, response);
+			prepareBoPaymentLogs(orderId, userId, url, responseObject);
 		} catch (Exception e) {
 			e.printStackTrace();
 
+		} finally {
+			try {
+				ObjectMapper mapper = new ObjectMapper();
+				BoPayInLogsEntity entity = new BoPayInLogsEntity();
+				entity.setOrderId(orderId);
+				entity.setRequest(mapper.writeValueAsString(url));
+				entity.setResponse(mapper.writeValueAsString(originalResponse));
+				entity.setUserId(userId);
+				entity.setErrorMsg(errorMessage);
+				boPayInLogsRepository.save(entity);
+
+			} catch (Exception e2) {
+				e2.printStackTrace();
+			}
 		}
-		return response;
+		return responseObject;
 	}
 
 	/*
@@ -207,22 +230,22 @@ public class BackOfficeRestService {
 	 * 
 	 * @author SOWMIYA
 	 */
-	private RestResponse<GenericResponse> prepareBoPaymentLogs(String orderId, String userId, URL url,
-			JSONArray response) {
+	private PaymentLogsEntity prepareBoPaymentLogs(String orderId, String userId, URL url, Object responseObject) {
 		ObjectMapper mapper = new ObjectMapper();
+		PaymentLogsEntity paymentLogEntity = new PaymentLogsEntity();
 		try {
-			PaymentLogsEntity paymentLogEntity = new PaymentLogsEntity();
+
 			paymentLogEntity.setOrderId(orderId);
 			paymentLogEntity.setUserId(userId);
 			paymentLogEntity.setRequest(mapper.writeValueAsString(url));
-			paymentLogEntity.setResponse(mapper.writeValueAsString(response));
+			paymentLogEntity.setResponse(mapper.writeValueAsString(responseObject));
 			paymentLogRepo.save(paymentLogEntity);
 
 		} catch (Exception e) {
 			e.printStackTrace();
 			Log.error(e.getMessage());
 		}
-		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+		return paymentLogEntity;
 
 	}
 
@@ -239,10 +262,15 @@ public class BackOfficeRestService {
 	 */
 	public Object loginBackOfficePayIn(String pUserId, String exchSegment, String referenceNu, double amount,
 			String bnkAccNum, String paymentId, String paymentMethod, int retryCount) {
-		JSONArray object = new JSONArray();
+		BoPayInLogsEntity entity = new BoPayInLogsEntity();
+		JSONObject object = new JSONObject();
+		JSONArray arrayResponse = new JSONArray();
+		URL url = null;
+		String originalResponse = "";
+		String errorMessage = "";
 		// int retryCount = 0;
 		try {
-			URL url = new URL(props.getBoPayInLogin());
+			url = new URL(props.getBoPayInLogin());
 			System.out.println("bopayin login" + url);
 			HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 			conn.setRequestMethod("GET");
@@ -256,9 +284,13 @@ public class BackOfficeRestService {
 				BufferedReader br1 = new BufferedReader(new InputStreamReader((conn.getInputStream())));
 				String output;
 				while ((output = br1.readLine()) != null) {
+					originalResponse = originalResponse + output;
 					if (output.contains("Login Successfuly")) {
-						object = (JSONArray) boPayIn(pUserId, exchSegment, referenceNu, amount, bnkAccNum, cookie,
+						object = (JSONObject) boPayIn(pUserId, exchSegment, referenceNu, amount, bnkAccNum, cookie,
 								paymentId, paymentMethod, 0);
+						if (object != null && !object.isEmpty()) {
+							arrayResponse.add(object);
+						}
 						ObjectMapper mapper = new ObjectMapper();
 						System.out.println(mapper.writeValueAsString(object));
 						System.out.println("bopayin login" + url);
@@ -274,10 +306,28 @@ public class BackOfficeRestService {
 				}
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
+			errorMessage = e.getMessage();
+			String message = " Payment of user " + pUserId + " with bank account no : " + bnkAccNum + " with amount "
+					+ amount + " is Failed with razorpay Id : " + paymentId + "   reason: " + errorMessage;
 
+			entity.setIsError(1);
+			emailUtils.paymentFailureEmail(message);
+			e.printStackTrace();
+		} finally {
+			try {
+				ObjectMapper mapper = new ObjectMapper();
+				entity.setOrderId(referenceNu);
+				entity.setRequest(mapper.writeValueAsString(url));
+				entity.setResponse(mapper.writeValueAsString(originalResponse));
+				entity.setUserId(pUserId);
+				entity.setErrorMsg(errorMessage);
+				boPayInLogsRepository.save(entity);
+
+			} catch (Exception e2) {
+				e2.printStackTrace();
+			}
 		}
-		return object;
+		return arrayResponse;
 	}
 
 	/*

@@ -119,7 +119,7 @@ public class PositionRestService {
 				if (StringUtil.isNotNullOrEmpty(output)) {
 					RestPositionFailResp fail = mapper.readValue(output, RestPositionFailResp.class);
 					if (StringUtil.isNotNullOrEmpty(fail.getEmsg()))
-						System.out.println("Error Connection in position api. Rsponse code -" + fail.getEmsg());
+						System.out.println("Error Connection in position api. Response code -" + fail.getEmsg());
 				}
 			}
 
@@ -465,7 +465,7 @@ public class PositionRestService {
 			@Override
 			public void run() {
 				try {
-					accessLogManager.insertRestAccessLog(accessLogModel);
+					accessLogManager.insert24RestAccessLog(accessLogModel);
 				} catch (Exception e) {
 					e.printStackTrace();
 				} finally {

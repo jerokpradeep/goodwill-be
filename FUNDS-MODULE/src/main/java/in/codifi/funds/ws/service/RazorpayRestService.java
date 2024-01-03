@@ -166,7 +166,7 @@ public class RazorpayRestService {
 			@Override
 			public void run() {
 				try {
-					accessLogManager.insertRestAccessLog(accessLogModel);
+					accessLogManager.insert24RestAccessLog(accessLogModel);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}

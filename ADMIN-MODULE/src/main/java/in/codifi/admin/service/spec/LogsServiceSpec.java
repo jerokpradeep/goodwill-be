@@ -23,7 +23,7 @@ public interface LogsServiceSpec {
 	 * @return
 	 */
 	RestResponse<GenericResponse> checkRestAccessLogTable();
-	
+
 	/**
 	 * method to get access log in database
 	 * 
@@ -50,6 +50,22 @@ public interface LogsServiceSpec {
 	 * @return
 	 */
 	RestResponse<GenericResponse> getAccessLogTablewithPageable(LogsRequestModel reqModel);
-	
-	
+
+	/**
+	 * method to check 24 rest access log tables
+	 * 
+	 * @author SowmiyaThangaraj
+	 * @return
+	 */
+	RestResponse<GenericResponse> check24RestAccessLogTables();
+
+	/**
+	 * method to get rest access logs
+	 * 
+	 * @author SowmiyaThangaraj
+	 * @param reqModel
+	 * @return
+	 */
+	RestResponse<GenericResponse> getRestAccessLogs(LogsRequestModel reqModel);
+
 }

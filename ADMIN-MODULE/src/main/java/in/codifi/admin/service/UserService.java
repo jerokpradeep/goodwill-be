@@ -10,7 +10,7 @@ import org.json.simple.JSONObject;
 
 import in.codifi.admin.model.response.GenericResponse;
 import in.codifi.admin.model.response.UsersLoggedInModel;
-import in.codifi.admin.repository.AccessLogManager;
+import in.codifi.admin.repository.UserLogManager;
 import in.codifi.admin.service.spec.UserServiceSpec;
 import in.codifi.admin.utility.AppConstants;
 import in.codifi.admin.utility.PrepareResponse;
@@ -21,7 +21,7 @@ public class UserService implements UserServiceSpec {
 	@Inject
 	PrepareResponse prepareResponse;
 	@Inject
-	AccessLogManager accessLogManager;
+	UserLogManager accessLogManager;
 
 	/**
 	 * method to get users logged in details
@@ -32,12 +32,18 @@ public class UserService implements UserServiceSpec {
 	public RestResponse<GenericResponse> getUserLoggedInDetails() {
 		UsersLoggedInModel model = new UsersLoggedInModel();
 		model = accessLogManager.getCountBySource();
-
+		int totalCount = accessLogManager.getTotalUserLoggedInDetails();
+		if (totalCount > 0) {
+			model.setTotalCount(totalCount);
+//			return prepareResponse.prepareSuccessResponseObject(model);
+		}
 		List<String> distinctVendor = accessLogManager.findDistinctVendors();
 		if (distinctVendor != null && !distinctVendor.isEmpty()) {
 			List<JSONObject> ssoCountByVendor = accessLogManager.getCountByVendor(distinctVendor);
+
 			if (ssoCountByVendor != null) {
 				model.setSso(ssoCountByVendor);
+				model.setTotalCount(totalCount);
 				return prepareResponse.prepareSuccessResponseObject(model);
 			}
 		} else {

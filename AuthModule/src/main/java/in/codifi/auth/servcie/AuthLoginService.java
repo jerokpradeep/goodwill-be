@@ -44,8 +44,8 @@ import in.codifi.auth.utility.StringUtil;
 import in.codifi.cache.model.ClinetInfoModel;
 import in.codifi.ws.model.client.LogoutRestReqModel;
 import in.codifi.ws.model.client.UserDetailsRestReqModel;
+import in.codifi.ws.model.kb.login.ForgotOTPRestReqModel;
 import in.codifi.ws.model.kb.login.ForgotPwdRestReqModel;
-import in.codifi.ws.model.kb.login.ForgotPwdRestRespModel;
 import in.codifi.ws.model.kb.login.QuickAuthLoginReqModel;
 import in.codifi.ws.model.kb.login.QuickAuthReqModel;
 import in.codifi.ws.model.kb.login.QuickAuthRespModel;
@@ -87,44 +87,60 @@ public class AuthLoginService implements AuthLoginServiceSpec {
 	@Inject
 	RestPropertiesConfig restPropertiesConfig;
 
-	/**
-	 * method to quick auth login
-	 * 
-	 * @author SowmiyaThangaraj
-	 */
-	@Override
-	public RestResponse<GenericResponse> quickAuthLogin(AuthReq authmodel) {
-		QuickAuthRespModel quickAuthRespModel = new QuickAuthRespModel();
-		try {
-			List<GetUserInfoResp> userInfo = verifyClient(authmodel);
-			if (userInfo != null && userInfo.size() > 0) {
-				String request = prepareQuickAuthRequest(authmodel, userInfo);
-				if (request != null) {
-					quickAuthRespModel = kambalaRestServices.quickAuthBypassLogin(request, authmodel.getSource(),
-							authmodel.getUserId());
-					if (quickAuthRespModel.getStat().equalsIgnoreCase(AppConstants.REST_STATUS_OK)) {
-						if (StringUtil.isNotNullOrEmpty(quickAuthRespModel.getSUserToken())) {
-							updateUserCache(quickAuthRespModel, authmodel.getUserId());
-							return prepareResponse.prepareSuccessMessage(AppConstants.SUCCESS_STATUS);
-						} else if (StringUtil.isNotNullOrEmpty(quickAuthRespModel.getEmsg())) {
-							System.out.println("Failed to get REST Session -" + quickAuthRespModel.getEmsg());
-							Log.error("Failed to get REST Session -" + quickAuthRespModel.getEmsg());
-						}
-
-					} else if (quickAuthRespModel.getStat().equalsIgnoreCase(AppConstants.REST_STATUS_NOT_OK)) {
-						return prepareResponse.prepareFailedResponseForRestService(quickAuthRespModel.getEmsg());
-					}
-				}
-			} else {
-				return prepareResponse.prepareFailedResponse(AppConstants.FAILED_LOGIN);
-			}
-
-		} catch (Exception e) {
-			e.printStackTrace();
-			Log.error("quickAuthLogin", e);
-		}
-		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
-	}
+//	/**
+//	 * method to quick auth login
+//	 * 
+//	 * @author SowmiyaThangaraj
+//	 */
+//	@Override
+//	public RestResponse<GenericResponse> quickAuthLogin(AuthReq authmodel) {
+//		QuickAuthRespModel quickAuthRespModel = new QuickAuthRespModel();
+//		loginRespModel respModel = new loginRespModel();
+//		String successMessage = AppConstants.SUCCESS_STATUS;
+//		try {
+//			List<GetUserInfoResp> userInfo = verifyClient(authmodel);
+//			if (userInfo != null && userInfo.size() > 0) {
+//				String request = prepareQuickAuthRequest(authmodel, userInfo);
+//				if (request != null) {
+//					quickAuthRespModel = kambalaRestServices.quickAuthBypassLogin(request, authmodel.getSource(),
+//							authmodel.getUserId());
+//					if (quickAuthRespModel.getStat().equalsIgnoreCase(AppConstants.REST_STATUS_OK)) {
+//						if (StringUtil.isNotNullOrEmpty(quickAuthRespModel.getSUserToken())) {
+//							updateUserCache(quickAuthRespModel, authmodel.getUserId());
+//							if (StringUtil.isNotNullOrEmpty(quickAuthRespModel.getEmsg())
+//									&& quickAuthRespModel.getEmsg().contains("Password Expired")) {
+//								respModel.setIsUpdate(1);
+//								successMessage = quickAuthRespModel.getEmsg();
+//							} else {
+//								respModel.setIsUpdate(0);
+//							}
+//							return prepareResponse.prepareSuccessResponseObjectQuickAuth(respModel, successMessage);
+//						} else if (StringUtil.isNotNullOrEmpty(quickAuthRespModel.getEmsg())) {
+//							System.out.println("Failed to get REST Session -" + quickAuthRespModel.getEmsg());
+//							Log.error("Failed to get REST Session -" + quickAuthRespModel.getEmsg());
+//						}
+//
+//					} else if (quickAuthRespModel.getStat().equalsIgnoreCase(AppConstants.REST_STATUS_NOT_OK)) {
+//						if (StringUtil.isNotNullOrEmpty(quickAuthRespModel.getEmsg())
+//								&& quickAuthRespModel.getEmsg().contains("Password Expired")) {
+//							respModel.setIsUpdate(1);
+//						} else {
+//							respModel.setIsUpdate(0);
+//						}
+//						return prepareResponse.prepareFailedResponseObjectQuickAuth(respModel,
+//								quickAuthRespModel.getEmsg());
+//					}
+//				}
+//			} else {
+//				return prepareResponse.prepareFailedResponse(AppConstants.FAILED_LOGIN);
+//			}
+//
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//			Log.error("quickAuthLogin", e);
+//		}
+//		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+//	}
 
 	/**
 	 * method to update user cache
@@ -820,44 +836,6 @@ public class AuthLoginService implements AuthLoginServiceSpec {
 	}
 
 	/**
-	 * method to forgot password otp
-	 * 
-	 * @author SowmiyaThangaraj
-	 * @return
-	 */
-	public RestResponse<GenericResponse> forgotPwdOTP(AuthReq reqModel) {
-		try {
-			if (StringUtil.isNullOrEmpty(reqModel.getUserId()) && StringUtil.isNullOrEmpty(reqModel.getPassword()))
-				return prepareResponse.prepareFailedResponse(AppConstants.INVALID_PARAMETER);
-			String request = prepareRequestForgotPwdOtp(reqModel);
-			if (StringUtil.isNullOrEmpty(request))
-				return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
-			ForgotPwdRestRespModel respModel = kambalaRestServices.forgotPwdOtp(request, reqModel.getUserId());
-			if (respModel != null && respModel.getStat().equalsIgnoreCase(AppConstants.REST_STATUS_OK)) {
-				return prepareResponse.prepareSuccessMessage(AppConstants.OTP_SENT);
-			} else {
-				return prepareResponse.prepareFailedResponse(respModel.getEmsg());
-			}
-
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
-	}
-
-	/**
-	 * method to prepare request
-	 * 
-	 * @author SowmiyaThangaraj
-	 * @param reqModel
-	 * @return
-	 */
-	private String prepareRequestForgotPwdOtp(AuthReq reqModel) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	/**
 	 * method to unblock users
 	 * 
 	 * @author SowmiyaThangaraj
@@ -1543,6 +1521,78 @@ public class AuthLoginService implements AuthLoginServiceSpec {
 			Log.error(e.getMessage());
 		}
 		return request;
+	}
+
+//	/**
+//	 * method to forgot password otp
+//	 * 
+//	 * @author SowmiyaThangaraj
+//	 */
+//	@Override
+//	public RestResponse<GenericResponse> forgotPwdotp(AuthReq authmodel) {
+//		ForgotOTPRestRespModel forgotOTPRespModel = new ForgotOTPRestRespModel();
+//		try {
+//			if (!validateOtpParams(authmodel))
+//				return prepareResponse.prepareFailedResponse(AppConstants.INVALID_PARAMETER);
+//			String request = prepareForgotOtpRequest(authmodel);
+//			if (StringUtil.isNotNullOrEmpty(request)) {
+//				forgotOTPRespModel = kambalaRestServices.forgotPwdOtp(request, authmodel.getUserId());
+//				if (forgotOTPRespModel.getReqStatus() != null) {
+//					return prepareResponse.prepareSuccessMessage(forgotOTPRespModel.getReqStatus());
+//				} else if (forgotOTPRespModel.getEmsg() != null) {
+//					return prepareResponse.prepareFailedResponse(forgotOTPRespModel.getEmsg());
+//				}
+//			}
+//
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//			Log.error("forgotPwdotp", e);
+//		}
+//
+//		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+//	}
+
+	/**
+	 * method to prepare forgot otp request
+	 * 
+	 * @author SowmiyaThangaraj
+	 * @param authmodel
+	 * @return
+	 */
+	private String prepareForgotOtpRequest(AuthReq authmodel) {
+		String request = "";
+		ForgotOTPRestReqModel reqModel = new ForgotOTPRestReqModel();
+		ObjectMapper mapper = new ObjectMapper();
+		try {
+			String pwd1 = appUtils.encryptWithSHA256(authmodel.getPassword());
+			String pwd2 = appUtils.encryptWithSHA256(pwd1);
+			String pwd3 = appUtils.encryptWithSHA256(pwd2);
+			reqModel.setUserId(authmodel.getUserId());
+			reqModel.setPassword(pwd3);
+			String model = mapper.writeValueAsString(reqModel);
+			request = AppConstants.JDATA + model;
+			Log.info("forgotOTPRequest  :", request);
+		} catch (Exception e) {
+			e.printStackTrace();
+
+		}
+		return request;
+	}
+
+	/**
+	 * method to validate otp params
+	 * 
+	 * @author SowmiyaThangaraj
+	 * 
+	 * @param authmodel
+	 * @return
+	 */
+	private boolean validateOtpParams(AuthReq authmodel) {
+		if (StringUtil.isNotNullOrEmpty(authmodel.getUserId())
+				&& StringUtil.isNotNullOrEmpty(authmodel.getPassword())) {
+			return true;
+		}
+		return false;
 	}
 
 }

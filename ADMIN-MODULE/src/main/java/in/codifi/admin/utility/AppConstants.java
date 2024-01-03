@@ -55,14 +55,13 @@ public class AppConstants {
 	public static final String HOLDINGS_FILE_FORMATS = ".TXT";
 	public static final String INSERTED_FAILED = "Inserted Failed";
 	public static final String T1TYPE = "T1";
-	
+
 	public static final String ALL = "all";
 	public static final String INDIVIDUAL = "individual";
 	public static final String UPDATED = "Updated";
-	//push notification
+	// push notification
 	public static final String NO_DEVICE_IS_FOR_USER = "No device id found for the given user ";
-	
-	
+
 	public static final String YES = "Yes";
 	public static final String NO = "No";
 	public static final String ATTRIBUTE_MOBILE = "mobile";
@@ -73,9 +72,12 @@ public class AppConstants {
 	public static final String PLEASE_ENTER_VALID_CREDENTIALS = "Please Enter Valid Credentials";
 	public static final String MULTIPLE_USER_LINKED = " linked with multiple client Id's. Kindly login with client code";
 	public static final String INVALID_CREDENTIALS = "Invalid userId or password";
-	
+
 	public static final String USER_UPDATED = "User details updated";
 	public static final String USER_NOT_UPDATED = "User details not updated";
 	public static final String ADMIN_USER = "Admin";
+	public static final String MODULE_ADMIN = "ADMIN";
+	public static final String CONTENT_TYPE = "CONTENT TYPE";
+	public static final String AUTHORIZATION = "Authorization";
 
 }

@@ -12,11 +12,11 @@ import in.codifi.admin.req.model.PayoutReq;
 import in.codifi.admin.service.spec.PaymentServiceSpec;
 
 @Path("/payment")
-public class PaymentController implements PaymentControllerSpec{
-	
+public class PaymentController implements PaymentControllerSpec {
+
 	@Inject
 	PaymentServiceSpec paymentService;
-	
+
 	/**
 	 * Method to get payout details
 	 * 

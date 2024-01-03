@@ -85,5 +85,5 @@ public class AppConstants {
 	public static final String MODULE_CLIENT = "Client";
 
 	public static final String JSESSONID = "jsessionid";
-
+	public static final String EXPIRY_DELETED = "Expiry Deleted";
 }

@@ -21,6 +21,8 @@ public class BasketMarginRestRespModel {
 	private String marginUsed;
 	@JsonProperty("marginusedtrade")
 	private String marginUsedTrade;
+	@JsonProperty("marginusedprev")
+	private String marginusedprev;
 	@JsonProperty("remarks")
 	private String remarks;
 

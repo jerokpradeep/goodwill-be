@@ -121,7 +121,7 @@ public class HoldingsRestService {
 				if (StringUtil.isNotNullOrEmpty(output)) {
 					Fail fail = mapper.readValue(output, Fail.class);
 					if (StringUtil.isNotNullOrEmpty(fail.getEmsg()))
-						System.out.println("Error Connection in holdings api. Rsponse code -" + fail.getEmsg());
+						System.out.println("Error Connection in holdings api. Response code -" + fail.getEmsg());
 				}
 			}
 
@@ -230,7 +230,7 @@ public class HoldingsRestService {
 			@Override
 			public void run() {
 				try {
-					accessLogManager.insertRestAccessLog(accessLogModel);
+					accessLogManager.insert24RestAccessLog(accessLogModel);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}

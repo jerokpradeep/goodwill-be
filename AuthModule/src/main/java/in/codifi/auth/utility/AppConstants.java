@@ -117,4 +117,7 @@ public class AppConstants {
 
 	public static final String USER_BLOCKED_ADMIN = "Your account has been blocked by adminstrator, please contact admin ( Unblock Accout option wont work )";
 
+	public static final String HAZEL_KEY_PWD = "_PWD";
+
+
 }

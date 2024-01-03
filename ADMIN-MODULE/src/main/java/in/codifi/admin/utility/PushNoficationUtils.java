@@ -47,13 +47,13 @@ public class PushNoficationUtils {
 
 			JSONObject androidNew = new JSONObject();
 			JSONObject notificationAndroidNew = new JSONObject();
-			notificationAndroidNew.put("channel_id", "chola_notification");
+			notificationAndroidNew.put("channel_id", "goodwill_notification");
 			androidNew.put("notification", notificationAndroidNew);
 			requestNew.put("android", androidNew);
 
 			JSONObject noramlNotification = new JSONObject();
-			noramlNotification.put("android_channel_id", "chola_notification");
-			noramlNotification.put("channel_id", "chola_notification");
+			noramlNotification.put("android_channel_id", "goodwill_notification");
+			noramlNotification.put("channel_id", "goodwill_notification");
 			noramlNotification.put("title_color", "#2a6d57");
 			noramlNotification.put("title", reqModel.getTitle());
 			noramlNotification.put("body", reqModel.getMessage());

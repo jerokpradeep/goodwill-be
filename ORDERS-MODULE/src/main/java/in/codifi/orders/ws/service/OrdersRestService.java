@@ -198,7 +198,7 @@ public class OrdersRestService {
 					}
 				}
 			} else {
-				System.out.println("Error Connection in place Order api. Rsponse code -" + responseCode);
+				System.out.println("Error Connection in place Order api. Response code -" + responseCode);
 				bufferedReader = new BufferedReader(new InputStreamReader((conn.getErrorStream())));
 				output = bufferedReader.readLine();
 				accessLogModel.setResBody(output);
@@ -277,7 +277,7 @@ public class OrdersRestService {
 				}
 
 			} else {
-				System.out.println("Error Connection in modify Order api. Rsponse code -" + responseCode);
+				System.out.println("Error Connection in modify Order api. Response code -" + responseCode);
 				bufferedReader = new BufferedReader(new InputStreamReader((conn.getErrorStream())));
 				output = bufferedReader.readLine();
 				accessLogModel.setResBody(output);
@@ -413,12 +413,15 @@ public class OrdersRestService {
 			BufferedReader bufferedReader;
 			String output = null;
 			if (responseCode == 401) {
+				accessLogModel.setResBody("Unauthorized");
+				insertRestAccessLogs(accessLogModel);
 				return prepareResponse.prepareUnauthorizedResponseBody();
-
 			} else if (responseCode == 200) {
 
 				bufferedReader = new BufferedReader(new InputStreamReader((conn.getInputStream())));
 				output = bufferedReader.readLine();
+				accessLogModel.setResBody(output);
+				insertRestAccessLogs(accessLogModel);
 				if (StringUtil.isNotNullOrEmpty(output)) {
 					cancelOrderRespModel = mapper.readValue(output, CancelOrderRespModel.class);
 					/** Bind the response to generic response **/
@@ -1089,7 +1092,7 @@ public class OrdersRestService {
 			@Override
 			public void run() {
 				try {
-					accessLogManager.insertRestAccessLog(accessLogModel);
+					accessLogManager.insert24RestAccessLog(accessLogModel);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -1157,7 +1160,7 @@ public class OrdersRestService {
 				}
 
 			} else {
-				System.out.println("Error Connection in Exit Sno Order api. Rsponse code -" + responseCode);
+				System.out.println("Error Connection in Exit Sno Order api. Response code -" + responseCode);
 				bufferedReader = new BufferedReader(new InputStreamReader((conn.getErrorStream())));
 				output = bufferedReader.readLine();
 				accessLogModel.setResBody(output);

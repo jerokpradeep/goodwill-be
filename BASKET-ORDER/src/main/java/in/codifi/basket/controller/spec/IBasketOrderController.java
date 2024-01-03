@@ -38,7 +38,7 @@ public interface IBasketOrderController {
 	 * 
 	 * @author Gowthaman M
 	 * @return
-	 */
+	 **/
 	@Path("/")
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
@@ -184,5 +184,9 @@ public interface IBasketOrderController {
 	@Produces(MediaType.APPLICATION_JSON)
 	RestResponse<GenericResponse> getBasketMarginList(List<BasketMarginRequest> reqModel);
 
+	@Path("/update")
+	@GET
+	@Produces(MediaType.APPLICATION_JSON)
+	RestResponse<GenericResponse> updateTesting();
 
 }

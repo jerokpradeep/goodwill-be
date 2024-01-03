@@ -19,6 +19,7 @@ public class RestAccessLogModel {
 	private String method;
 	private String reqBody;
 	private String resBody;
+	private String tableName;
 	private Timestamp createdOn;
 	private Timestamp updatedOn;
 }

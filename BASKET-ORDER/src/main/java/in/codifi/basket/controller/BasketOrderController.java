@@ -274,4 +274,8 @@ public class BasketOrderController implements IBasketOrderController {
 		}
 		return basketOrderService.getBasketMarginList(reqModel, info);
 	}
+
+	public RestResponse<GenericResponse> updateTesting() {
+		return basketOrderService.updateTesting();
+	}
 }

@@ -135,4 +135,6 @@ public interface IBasketOrderService {
 	 */
 	RestResponse<GenericResponse> getBasketMarginList(List<BasketMarginRequest> reqModel, ClinetInfoModel info);
 
+	RestResponse<GenericResponse> updateTesting();
+
 }

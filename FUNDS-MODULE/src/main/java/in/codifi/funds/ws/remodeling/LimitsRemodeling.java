@@ -43,13 +43,13 @@ public class LimitsRemodeling {
 //			float respPayin = payin + unclearedCash;
 //			float availableMarigin = (openingBalance + payin + unclearedCash + stockPledge + holdingSellCredit)
 //					- (marginUsed + payout);
-			/** Change request by Raghuram - 17-05-23**/
+			/** Change request by Raghuram - 17-05-23 **/
 			float availableMarigin = (openingBalance + payin + unclearedCash + stockPledge) - (marginUsed);
 
 			float span = StringUtil.isNotNullOrEmpty(model.getSpan()) ? Float.parseFloat(model.getSpan()) : 0;
 			float exposure = StringUtil.isNotNullOrEmpty(model.getExpo()) ? Float.parseFloat(model.getExpo()) : 0;
 			float premium = StringUtil.isNotNullOrEmpty(model.getPremium()) ? Float.parseFloat(model.getPremium()) : 0;
-
+			float daycash = StringUtil.isNotNullOrEmpty(model.getDaycash()) ? Float.parseFloat(model.getDaycash()) : 0;
 			response.setOpeningBalance(openingBalance);
 			response.setPayin(payin);
 			response.setMarginUsed(marginUsed);
@@ -62,6 +62,7 @@ public class LimitsRemodeling {
 			response.setPremium(premium);
 			response.setUnclearedCash(unclearedCash);
 			response.setPayout(payout);
+			response.setDayCash(daycash);
 		} catch (Exception e) {
 			e.printStackTrace();
 			Log.error(e.getMessage());

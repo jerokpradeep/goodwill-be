@@ -93,6 +93,7 @@ public class LogsDatabaseConnection {
 						+ " (id int AUTO_INCREMENT  PRIMARY KEY, user_id VARCHAR(100), module VARCHAR(45), method varchar(45),"
 						+ "url varchar(150),req_body text,res_body text,in_time timestamp(3),out_time timestamp(3),total_time timestamp(3),"
 						+ " created_on datetime DEFAULT CURRENT_TIMESTAMP,updated_on datetime DEFAULT CURRENT_TIMESTAMP)";
+//				System.out.println(tableName);
 				statement.executeUpdate(sql);
 			}
 			statement.close();
@@ -327,18 +328,18 @@ public class LogsDatabaseConnection {
 								result.setDomain(rSet.getString("domain"));
 								result.setContent_type(rSet.getString("content_type"));
 								result.setSession(rSet.getString("session"));
-								result.setElapsed_time(rSet.getDate("elapsed_time"));
 								result.setCreated_on(rSet.getString("created_on"));
 								response.add(result);
 								PaginationList = getPaginationList(response, pageNo, pageSize);
 							}
 						}
+						statement.close();
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
+
 				}
 				connection.close();
-
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -374,7 +375,6 @@ public class LogsDatabaseConnection {
 								result.setDomain(rSet.getString("domain"));
 								result.setContent_type(rSet.getString("content_type"));
 								result.setSession(rSet.getString("session"));
-								result.setElapsed_time(rSet.getDate("elapsed_time"));
 								result.setCreated_on(rSet.getString("created_on"));
 								response.add(result);
 								PaginationList = getPaginationList(response, pageNo, pageSize);
@@ -383,9 +383,9 @@ public class LogsDatabaseConnection {
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
+
 				}
 				connection.close();
-
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -421,7 +421,6 @@ public class LogsDatabaseConnection {
 								result.setDomain(rSet.getString("domain"));
 								result.setContent_type(rSet.getString("content_type"));
 								result.setSession(rSet.getString("session"));
-								result.setElapsed_time(rSet.getDate("elapsed_time"));
 								result.setCreated_on(rSet.getString("created_on"));
 								response.add(result);
 								PaginationList = getPaginationList(response, pageNo, pageSize);
@@ -430,9 +429,9 @@ public class LogsDatabaseConnection {
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
+
 				}
 				connection.close();
-
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -465,7 +464,6 @@ public class LogsDatabaseConnection {
 								result.setDomain(rSet.getString("domain"));
 								result.setContent_type(rSet.getString("content_type"));
 								result.setSession(rSet.getString("session"));
-								result.setElapsed_time(rSet.getDate("elapsed_time"));
 								result.setCreated_on(rSet.getString("created_on"));
 								response.add(result);
 								PaginationList = getPaginationList(response, pageNo, pageSize);
@@ -477,10 +475,9 @@ public class LogsDatabaseConnection {
 
 				}
 				connection.close();
-
 			} catch (Exception e) {
 				e.printStackTrace();
-			} 
+			}
 		}
 		return PaginationList;
 	}
@@ -503,6 +500,115 @@ public class LogsDatabaseConnection {
 			paginatedList = response.subList(startIndex, endIndex);
 		}
 
+		return paginatedList;
+	}
+
+	/**
+	 * method to get rest access logs from date to to date
+	 * 
+	 * @author SowmiyaThangaraj
+	 * @param tableNames
+	 * @param userId
+	 * @param uri
+	 * @param fromDate
+	 * @param toDate
+	 * @param pageNo
+	 * @param pageSize
+	 * @return
+	 */
+	public List<AccessLogRespModel> getRestAccessTableswithPage(List<String> tableNames, String userId, String uri,
+			String fromDate, String toDate, int pageNo, int pageSize) {
+		List<AccessLogRespModel> accessRespModel = new ArrayList<>();
+		List<AccessLogRespModel> paginatedList = null;
+		if (StringUtil.isNotNullOrEmpty(userId)) {
+			try {
+				Connection connection = dataSource.getConnection();
+				String databaseName = "logs_db";
+
+				for (String tableName : tableNames) {
+					System.out.println("logs tableName-- " + databaseName + "." + tableName);
+					String sql = "select "
+							+ "id , user_id, module, method, url, req_body, res_body, in_time, out_time, total_time, created_on, updated_on from "
+							+ databaseName + "." + tableName + " where user_id = ? and in_time >= ? and out_time <= ?";
+					try (PreparedStatement statement = connection.prepareStatement(sql)) {
+						int parampose = 1;
+						statement.setString(parampose++, userId);
+						statement.setString(parampose++, fromDate);
+						statement.setString(parampose++, toDate);
+						try (ResultSet rSet = statement.executeQuery()) {
+							while (rSet.next()) {
+								AccessLogRespModel model = new AccessLogRespModel();
+								model.setId(rSet.getInt("id"));
+								model.setUserId(rSet.getString("user_id"));
+								model.setModule(rSet.getString("module"));
+								model.setMethod(rSet.getString("method"));
+								model.setUrl(rSet.getString("url"));
+								model.setReqBody(rSet.getString("req_body"));
+								model.setResBody(rSet.getString("res_body"));
+								model.setInTime(rSet.getTimestamp("in_time").toString());
+								if (rSet.getTimestamp("out_time") != null) {
+									model.setOutTime(rSet.getTimestamp("out_time").toString());
+								}
+								model.setTotalTime(rSet.getTimestamp("total_time"));
+								model.setCreatedOn(rSet.getString("created_on"));
+								model.setUpdatedOn(rSet.getString("updated_on"));
+								accessRespModel.add(model);
+								paginatedList = getPaginatedList(accessRespModel, pageNo, pageSize);
+							}
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					}
+				}
+				connection.close();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		} else {
+			try {
+				Connection connection = dataSource.getConnection();
+				String databaseName = "logs_db";
+
+				for (String tableName : tableNames) {
+					System.out.println("logs tableName-- " + databaseName + "." + tableName);
+					String sql = "select "
+							+ "id , user_id, module, method, url, req_body, res_body, in_time, out_time, total_time, created_on, updated_on from "
+							+ databaseName + "." + tableName + " where in_time >= ? and out_time <= ?";
+					try (PreparedStatement statement = connection.prepareStatement(sql)) {
+						int parampose = 1;
+						statement.setString(parampose++, fromDate);
+						statement.setString(parampose++, toDate);
+						try (ResultSet rSet = statement.executeQuery()) {
+							while (rSet.next()) {
+								AccessLogRespModel model = new AccessLogRespModel();
+								model.setId(rSet.getInt("id"));
+								model.setUserId(rSet.getString("user_id"));
+								model.setModule(rSet.getString("module"));
+								model.setMethod(rSet.getString("method"));
+								model.setUrl(rSet.getString("url"));
+								model.setReqBody(rSet.getString("req_body"));
+								model.setResBody(rSet.getString("res_body"));
+								model.setInTime(rSet.getTimestamp("in_time").toString());
+								if (rSet.getTimestamp("out_time") != null) {
+									model.setOutTime(rSet.getTimestamp("out_time").toString());
+								}
+								model.setTotalTime(rSet.getTimestamp("total_time"));
+								model.setCreatedOn(rSet.getString("created_on"));
+								model.setUpdatedOn(rSet.getString("updated_on"));
+								accessRespModel.add(model);
+								paginatedList = getPaginatedList(accessRespModel, pageNo, pageSize);
+							}
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					}
+
+				}
+				connection.close();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
 		return paginatedList;
 	}
 

@@ -108,6 +108,10 @@ public class OrderExecutionService implements OrderExecutionServiceSpec {
 					return prepareResponse.prepareFailedResponseBody(AppConstants.FAILED_STATUS);
 				} else if (req.equalsIgnoreCase(AppConstants.CANNOT_SELL_CNC)) {
 					return prepareResponse.prepareFailedResponseBody(AppConstants.CANNOT_SELL_CNC);
+				} else if (req.equalsIgnoreCase(AppConstants.INVALID_COMBINATION)) {
+					return prepareResponse.prepareFailedResponseBody(AppConstants.INVALID_COMBINATION);
+				} else if (req.equalsIgnoreCase(AppConstants.CANNOT_SELL_AMO)) {
+					return prepareResponse.prepareFailedResponseBody(AppConstants.CANNOT_SELL_AMO);
 				}
 
 				/** Execute Place Order **/

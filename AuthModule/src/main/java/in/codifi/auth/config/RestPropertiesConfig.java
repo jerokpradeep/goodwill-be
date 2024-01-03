@@ -69,4 +69,10 @@ public class RestPropertiesConfig {
 	@ConfigProperty(name = "appconfig.kambala.logout")
 	private String kambalaLogout;
 
+	@ConfigProperty(name = "appconfig.kambala.weblogin")
+	private String kambalaWebLoginUrl;
+
+	@ConfigProperty(name = "appconfig.kambala.moblogin")
+	private String kambalaMobLoginUrl;
+
 }

@@ -109,7 +109,7 @@ public class EDISRestService {
 					response = mapper.readValue(output, EDISRestRespModel.class);
 					if (StringUtil.isNotNullOrEmpty(response.getEmsg()))
 						System.out.println(
-								"Error Connection in Initialize edis api. Rsponse code -" + response.getEmsg());
+								"Error Connection in Initialize edis api. Response code -" + response.getEmsg());
 				}
 			}
 		} catch (Exception e) {
@@ -133,7 +133,7 @@ public class EDISRestService {
 			@Override
 			public void run() {
 				try {
-					accessLogManager.insertRestAccessLog(accessLogModel);
+					accessLogManager.insert24RestAccessLog(accessLogModel);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}

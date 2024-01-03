@@ -25,6 +25,7 @@ import in.codifi.funds.entity.primary.BOPaymentLogEntity;
 import in.codifi.funds.entity.primary.PaymentRefEntity;
 import in.codifi.funds.entity.primary.UpiDetailsEntity;
 import in.codifi.funds.helper.PaymentHelper;
+import in.codifi.funds.model.request.BOPayinReqModel;
 import in.codifi.funds.model.request.PaymentReqModel;
 import in.codifi.funds.model.request.UPIReqModel;
 import in.codifi.funds.model.request.VerifyPaymentReqModel;
@@ -481,6 +482,7 @@ public class PaymentService implements PaymentServiceSpec {
 					}
 				} catch (Exception e) {
 					e.printStackTrace();
+
 				}
 			}
 		});
@@ -841,5 +843,69 @@ public class PaymentService implements PaymentServiceSpec {
 			e.printStackTrace();
 		}
 		return request;
+	}
+
+	/**
+	 * method to back office pay in
+	 * 
+	 * @author SowmiyaThangaraj
+	 */
+	@Override
+	public RestResponse<GenericResponse> boPayIn(BOPayinReqModel reqModel) {
+		try {
+			if (!validatePayinModel(reqModel))
+				return prepareResponse.prepareFailedResponse(AppConstants.INVALID_PARAMETER);
+			JSONArray jsonArray = BOPayment(reqModel);
+			if (jsonArray != null) {
+				return prepareResponse.prepareSuccessResponseObject(jsonArray);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+	}
+
+	/**
+	 * method to validate pay in model
+	 * 
+	 * @author SowmiyaThangaraj
+	 * @param reqModel
+	 * @return
+	 */
+	private boolean validatePayinModel(BOPayinReqModel reqModel) {
+		if (StringUtil.isNotNullOrEmpty(reqModel.getAccountNumber())
+				&& StringUtil.isNotNullOrEmpty(reqModel.getExchangeSegment())
+				&& StringUtil.isNotNullOrEmpty(reqModel.getRazorpayOrderId())
+				&& StringUtil.isNotNullOrEmpty(reqModel.getPaymentMethod())
+				&& StringUtil.isNotNullOrEmpty(reqModel.getUserId())
+				&& StringUtil.isNotNullOrEmpty(reqModel.getRazorpayPaymentId()) && reqModel.getAmount() > 50) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * method to bo payment
+	 * 
+	 * @author SowmiyaThangaraj
+	 * @param reqModel
+	 * @return
+	 */
+	private JSONArray BOPayment(BOPayinReqModel reqModel) {
+		PaymentRefEntity entity = new PaymentRefEntity();
+		entity.setAccNum(reqModel.getAccountNumber());
+		entity.setAmount(reqModel.getAmount());
+		entity.setExchSeg(reqModel.getExchangeSegment());
+		entity.setPaymentMethod(reqModel.getPaymentMethod());
+		entity.setOrderId("manual_" + reqModel.getRazorpayOrderId());
+		entity.setUserId(reqModel.getUserId());
+		entity.setCreatedBy("manual_" + reqModel.getUserId());
+		entity.setUpdatedBy("manual_" + reqModel.getUserId());
+		paymentRefRepo.save(entity);
+		JSONArray boPayInResponse = (JSONArray) backOfficeRestService.loginBackOfficePayIn(reqModel.getUserId(),
+				reqModel.getExchangeSegment(), reqModel.getRazorpayOrderId(), reqModel.getAmount(),
+				reqModel.getAccountNumber(), reqModel.getRazorpayPaymentId(), reqModel.getPaymentMethod(), 0);
+		return boPayInResponse;
+
 	}
 }

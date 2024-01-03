@@ -27,6 +27,7 @@ import in.codifi.auth.utility.CommonUtils;
 import in.codifi.auth.utility.PrepareResponse;
 import in.codifi.auth.utility.StringUtil;
 import in.codifi.ws.model.client.LogoutRestRespModel;
+import in.codifi.ws.model.kb.login.ForgotOTPRestRespModel;
 import in.codifi.ws.model.kb.login.ForgotPwdRestRespModel;
 import in.codifi.ws.model.kb.login.QuickAuthRespModel;
 import in.codifi.ws.model.kc.ChangePwdRestRespModel;
@@ -188,6 +189,138 @@ public class KambalaRestServices {
 	}
 
 	/**
+	 * Method to call kambala API to get user session
+	 * 
+	 * @author Dinesh Kumar
+	 *
+	 * @param request
+	 * @return
+	 */
+	public QuickAuthRespModel quickAuthBypassLoginforWeb(String request, String source, String userId) {
+
+		QuickAuthRespModel respModel = null;
+		try {
+			Log.info("Kambal web Login req - " + request);
+			AppUtils.trustedManagement();
+			String baseUrl = props.getKambalaWebLoginUrl();
+			RestAccessLogModel accessLogModel = new RestAccessLogModel();
+			accessLogModel.setMethod("quickAuthBypassLoginForWeb");
+			accessLogModel.setModule(AppConstants.MODULE);
+			accessLogModel.setUrl(baseUrl);
+			accessLogModel.setReqBody(request);
+			accessLogModel.setUserId(userId);
+			accessLogModel.setInTime(new Timestamp(new Date().getTime()));
+
+			Log.info("Kambala web Login urls-" + baseUrl);
+			URL url = new URL(baseUrl);
+			HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+			conn.setRequestMethod(AppConstants.POST_METHOD);
+			conn.setRequestProperty("Accept", AppConstants.TEXT_PLAIN);
+			conn.setDoOutput(true);
+			try (OutputStream os = conn.getOutputStream()) {
+				byte[] input = request.getBytes("utf-8");
+				os.write(input, 0, input.length);
+			}
+			int responseCode = conn.getResponseCode();
+			accessLogModel.setOutTime(new Timestamp(new Date().getTime()));
+			BufferedReader bufferedReader;
+			String output = null;
+			if (responseCode == 200) {
+				bufferedReader = new BufferedReader(new InputStreamReader((conn.getInputStream())));
+				output = bufferedReader.readLine();
+				accessLogModel.setResBody(output);
+				insertRestAccessLogs(accessLogModel);
+				if (StringUtil.isNotNullOrEmpty(output)) {
+					Log.info("Kambal web Login Resp - " + output);
+					respModel = mapper.readValue(output, QuickAuthRespModel.class);
+				}
+			} else {
+				System.out.println("Error Connection in web Login api. Response code -" + responseCode);
+				bufferedReader = new BufferedReader(new InputStreamReader((conn.getErrorStream())));
+				output = bufferedReader.readLine();
+				accessLogModel.setResBody(output);
+				insertRestAccessLogs(accessLogModel);
+				if (StringUtil.isNotNullOrEmpty(output)) {
+					Log.info("Kambal web Login Resp - " + output);
+					respModel = mapper.readValue(output, QuickAuthRespModel.class);
+				}
+			}
+
+		} catch (Exception e1) {
+			e1.printStackTrace();
+			Log.error(e1.getMessage());
+		}
+
+		return respModel;
+	}
+
+	/**
+	 * Method to call kambala API to get user session
+	 * 
+	 * @author Dinesh Kumar
+	 *
+	 * @param request
+	 * @return
+	 */
+	public QuickAuthRespModel quickAuthBypassLoginForMob(String request, String source, String userId) {
+
+		QuickAuthRespModel respModel = null;
+		try {
+			Log.info("Kambal mob Login req - " + request);
+			AppUtils.trustedManagement();
+			String baseUrl = props.getKambalaMobLoginUrl();
+			RestAccessLogModel accessLogModel = new RestAccessLogModel();
+			accessLogModel.setMethod("quickAuthBypassLoginForMob");
+			accessLogModel.setModule(AppConstants.MODULE);
+			accessLogModel.setUrl(baseUrl);
+			accessLogModel.setReqBody(request);
+			accessLogModel.setUserId(userId);
+			accessLogModel.setInTime(new Timestamp(new Date().getTime()));
+
+			Log.info("Kambala Login for mob urls-" + baseUrl);
+			URL url = new URL(baseUrl);
+			HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+			conn.setRequestMethod(AppConstants.POST_METHOD);
+			conn.setRequestProperty("Accept", AppConstants.TEXT_PLAIN);
+			conn.setDoOutput(true);
+			try (OutputStream os = conn.getOutputStream()) {
+				byte[] input = request.getBytes("utf-8");
+				os.write(input, 0, input.length);
+			}
+			int responseCode = conn.getResponseCode();
+			accessLogModel.setOutTime(new Timestamp(new Date().getTime()));
+			BufferedReader bufferedReader;
+			String output = null;
+			if (responseCode == 200) {
+				bufferedReader = new BufferedReader(new InputStreamReader((conn.getInputStream())));
+				output = bufferedReader.readLine();
+				accessLogModel.setResBody(output);
+				insertRestAccessLogs(accessLogModel);
+				if (StringUtil.isNotNullOrEmpty(output)) {
+					Log.info("Kambal Login mob Resp - " + output);
+					respModel = mapper.readValue(output, QuickAuthRespModel.class);
+				}
+			} else {
+				System.out.println("Error Connection in mob Login api. Response code -" + responseCode);
+				bufferedReader = new BufferedReader(new InputStreamReader((conn.getErrorStream())));
+				output = bufferedReader.readLine();
+				accessLogModel.setResBody(output);
+				insertRestAccessLogs(accessLogModel);
+				if (StringUtil.isNotNullOrEmpty(output)) {
+					Log.info("Kambal mob Login Resp - " + output);
+					respModel = mapper.readValue(output, QuickAuthRespModel.class);
+				}
+			}
+
+		} catch (Exception e1) {
+			e1.printStackTrace();
+			Log.error(e1.getMessage());
+		}
+
+		return respModel;
+	}
+
+	/**
 	 * 
 	 * Method to get client details to validate the session
 	 * 
@@ -261,7 +394,7 @@ public class KambalaRestServices {
 			@Override
 			public void run() {
 				try {
-					accessLogManager.insertRestAccessLog(accessLogModel);
+					accessLogManager.insert24RestAccessLog(accessLogModel);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -364,8 +497,8 @@ public class KambalaRestServices {
 	 * @param userId
 	 * @return
 	 */
-	public ForgotPwdRestRespModel forgotPwdOtp(String request, String userId) {
-		ForgotPwdRestRespModel respModel = new ForgotPwdRestRespModel();
+	public ForgotOTPRestRespModel forgotPwdOtp(String request, String userId) {
+		ForgotOTPRestRespModel respModel = new ForgotOTPRestRespModel();
 		try {
 			Log.info("Kambal forgot pwd otp req - " + request);
 			AppUtils.trustedManagement();
@@ -399,7 +532,7 @@ public class KambalaRestServices {
 				insertRestAccessLogs(accessLogModel);
 				if (StringUtil.isNotNullOrEmpty(output)) {
 					Log.info("Kambal forgot pwd Resp - " + output);
-					respModel = mapper.readValue(output, ForgotPwdRestRespModel.class);
+					respModel = mapper.readValue(output, ForgotOTPRestRespModel.class);
 				}
 			} else {
 				System.out.println("Error Connection in forgot pwd api. Response code -" + responseCode);
@@ -409,7 +542,7 @@ public class KambalaRestServices {
 				insertRestAccessLogs(accessLogModel);
 				if (StringUtil.isNotNullOrEmpty(output)) {
 					Log.info("Kambal forgot pwd Resp - " + output);
-					respModel = mapper.readValue(output, ForgotPwdRestRespModel.class);
+					respModel = mapper.readValue(output, ForgotOTPRestRespModel.class);
 				}
 			}
 		} catch (Exception e) {

@@ -26,5 +26,6 @@ public class LimitsResponseModel implements Serializable {
 	private float premium;
 	private float unclearedCash;
 	private float payout;
+	private float dayCash;
 
 }

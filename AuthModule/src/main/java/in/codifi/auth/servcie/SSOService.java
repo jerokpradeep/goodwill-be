@@ -23,6 +23,7 @@ import in.codifi.auth.model.response.VendorRespModel;
 import in.codifi.auth.repository.AccessLogManager;
 import in.codifi.auth.repository.ApiKeyRepository;
 import in.codifi.auth.repository.VendorRepository;
+import in.codifi.auth.repository.VendorSubcriptionDAO;
 import in.codifi.auth.repository.VendorSubcriptionRepository;
 import in.codifi.auth.servcie.spec.SSOServiceSpec;
 import in.codifi.auth.utility.APITokenModule;
@@ -52,8 +53,8 @@ public class SSOService implements SSOServiceSpec {
 	@Inject
 	VendorSubcriptionRepository subcriptionRepository;
 
-//	@Inject
-//	VendorSubcriptionRepository subcriptionDao;
+	@Inject
+	VendorSubcriptionDAO subcriptionDao;
 
 	@Inject
 	CommonUtils commonUtils;
@@ -112,6 +113,7 @@ public class SSOService implements SSOServiceSpec {
 				HazelcastConfig.getInstance().getVendorAuthCode().put(temAuthCode.toUpperCase(), authReq.getUserId());
 				vendorRespModel.setRedirectUrl(
 						vendorDetails.getRedirectUrl() + "?authCode=" + authCode + "&userId=" + authReq.getUserId());
+				vendorRespModel.setAuthorized(true);
 				return prepareResponse.prepareSuccessResponseObject(vendorRespModel);
 			} else {
 
@@ -123,9 +125,9 @@ public class SSOService implements SSOServiceSpec {
 				subcriptionEntity.setUserId(authReq.getUserId());
 				subcriptionEntity.setAuthorizationStatus(1);
 				subcriptionEntity.setCreatedBy(authReq.getUserId());
-				VendorSubcriptionEntity subcriptionEntityNew = subcriptionRepository.saveAndFlush(subcriptionEntity);
-//				boolean authorizeVendor = subcriptionDao.authorizeUser(vendorDetails.getId(), authReq.getUserId());
-				if (subcriptionEntityNew != null) {
+//				VendorSubcriptionEntity subcriptionEntityNew = subcriptionRepository.saveAndFlush(subcriptionEntity);
+				boolean authorizeVendor = subcriptionDao.authorizeUser(vendorDetails.getId(), authReq.getUserId());
+				if (authorizeVendor) {
 					String authCode = CommonUtils.randomAlphaNumeric(20).toUpperCase();
 					String temAuthCode = apiKey + "_" + authCode;
 					String shaKey = commonUtils.generateSHAKey(authReq.getUserId(), authCode,
@@ -136,6 +138,7 @@ public class SSOService implements SSOServiceSpec {
 							authReq.getUserId());
 					vendorRespModel.setRedirectUrl(vendorDetails.getRedirectUrl() + "?authCode=" + authCode + "&userId="
 							+ authReq.getUserId());
+					vendorRespModel.setAuthorized(true);
 					return prepareResponse.prepareSuccessResponseObject(vendorRespModel);
 				} else {
 					return prepareResponse.prepareFailedResponse(AppConstants.INTERNAL_ERROR);

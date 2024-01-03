@@ -98,14 +98,15 @@ public class AdvanceMWTestController implements AdvanceMWTestControllerSpec {
 	 */
 	@Override
 	public RestResponse<ResponseModel> sortMwScrips(MwRequestModel pDto) {
-		ClinetInfoModel info = appUtil.getClientInfo();
-		if (info == null || StringUtil.isNullOrEmpty(info.getUserId())) {
-			Log.error("Client info is null");
-			return prepareResponse.prepareFailedResponse(AppConstants.INVALID_PARAMETER);
-		} else {
-			return advanceMWService.sortMwScrips(pDto, info);
+//		ClinetInfoModel info = appUtil.getClientInfo();
+//		if (info == null || StringUtil.isNullOrEmpty(info.getUserId())) {
+//			Log.error("Client info is null");
+//			return prepareResponse.prepareFailedResponse(AppConstants.INVALID_PARAMETER);
+//		} else {
+		String userid = "GC110180";
+			return advanceMWService.sortMwScrips(pDto, userid);
 
-		}
+//		}
 	}
 
 }

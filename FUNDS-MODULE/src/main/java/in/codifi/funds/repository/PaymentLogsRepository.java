@@ -6,4 +6,5 @@ import in.codifi.funds.entity.primary.PaymentLogsEntity;
 
 public interface PaymentLogsRepository extends JpaRepository<PaymentLogsEntity, Long> {
 
+
 }

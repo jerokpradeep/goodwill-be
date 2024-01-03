@@ -1,7 +1,10 @@
 package in.codifi.basket.repository;
 
 import java.math.BigInteger;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
@@ -9,6 +12,7 @@ import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import javax.persistence.EntityManager;
 import javax.persistence.Query;
+import javax.sql.DataSource;
 import javax.transaction.Transactional;
 
 import org.jboss.resteasy.reactive.RestResponse;
@@ -26,6 +30,8 @@ public class BasketOrderEntityManager {
 	EntityManager entityManager;
 	@Inject
 	PrepareResponse prepareResponse;
+	@Inject
+	DataSource dataSource;
 
 	/**
 	 * Method to get basket order report by user Id
@@ -114,6 +120,34 @@ public class BasketOrderEntityManager {
 			Log.error(e.getMessage());
 		}
 		return deleteCount;
+	}
+
+	public int updateExecuteOrdersIntoDB(String userId, int basketId) {
+		int isUpdate = 0;
+		Connection conn = null;
+		PreparedStatement pStmt = null;
+		java.sql.Timestamp timestamp = new java.sql.Timestamp(Calendar.getInstance().getTimeInMillis());
+		try {
+
+			conn = dataSource.getConnection();
+			pStmt = conn.prepareStatement(
+					"UPDATE tbl_basket_order SET is_executed = ?, updated_by = ?, updated_on = ? WHERE user_id = ?and basket_id = ? ");
+			int paramPos = 1;
+
+			pStmt.setString(paramPos++, "1");
+			pStmt.setString(paramPos++, userId);
+			pStmt.setTimestamp(paramPos++, timestamp);
+			pStmt.setString(paramPos++, userId);
+			pStmt.setInt(paramPos++, basketId);
+			isUpdate = pStmt.executeUpdate();
+			if (isUpdate > 0) {
+				return isUpdate;
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return isUpdate;
 	}
 
 }

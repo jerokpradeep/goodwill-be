@@ -9,6 +9,7 @@ import javax.ws.rs.core.MediaType;
 
 import org.jboss.resteasy.reactive.RestResponse;
 
+import in.codifi.funds.model.request.BOPayinReqModel;
 import in.codifi.funds.model.request.PaymentReqModel;
 import in.codifi.funds.model.request.UPIReqModel;
 import in.codifi.funds.model.request.VerifyPaymentReqModel;
@@ -143,5 +144,17 @@ public interface PaymentControllerSpec {
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
 	RestResponse<GenericResponse> getHSToken();
+
+	/**
+	 * method to get hs token for payout
+	 * 
+	 * @author SOWMIYA
+	 */
+
+	@Path("/bopayin")
+	@POST
+	@Produces(MediaType.APPLICATION_JSON)
+	@Consumes(MediaType.APPLICATION_JSON)
+	RestResponse<GenericResponse> boPayIn(BOPayinReqModel reqModel);
 
 }
