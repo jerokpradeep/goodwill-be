@@ -16,5 +16,15 @@ public class ApplicationProperties {
 	private String appKey;
 	@ConfigProperty(name = "appconfig.kc.vendorcode")
 	private String vendorCode;
+	
+	@ConfigProperty(name = "appconfig.kc.mob.appkey")
+	private String mobAppKey;
+	@ConfigProperty(name = "appconfig.kc.mob.vendorcode")
+	private String mobVendorCode;
+	
+	@ConfigProperty(name = "appconfig.kc.web.appkey")
+	private String webAppKey;
+	@ConfigProperty(name = "appconfig.kc.web.vendorcode")
+	private String webVendorCode;
 
 }

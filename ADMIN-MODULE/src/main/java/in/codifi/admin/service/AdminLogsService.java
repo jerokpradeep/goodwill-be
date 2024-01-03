@@ -15,7 +15,7 @@ import in.codifi.admin.model.response.AccesslogResponseModel;
 import in.codifi.admin.model.response.GenericResponse;
 import in.codifi.admin.model.response.LogDetailsResponseModel;
 import in.codifi.admin.model.response.UsersLoggedInModel;
-import in.codifi.admin.repository.AccessLogManager;
+import in.codifi.admin.repository.UserLogManager;
 import in.codifi.admin.repository.AdminLogsDAO;
 import in.codifi.admin.service.spec.AdminLogsServiceSpec;
 import in.codifi.admin.utility.AppConstants;
@@ -35,7 +35,7 @@ public class AdminLogsService implements AdminLogsServiceSpec {
 	@Inject
 	AdminLogsDAO adminDAO;
 	@Inject
-	AccessLogManager accessLogManager;
+	UserLogManager accessLogManager;
 
 	@Inject
 

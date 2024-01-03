@@ -3,6 +3,7 @@ package in.codifi.funds.service.spec;
 import org.jboss.resteasy.reactive.RestResponse;
 
 import in.codifi.cache.model.ClinetInfoModel;
+import in.codifi.funds.model.request.BOPayinReqModel;
 import in.codifi.funds.model.request.PaymentReqModel;
 import in.codifi.funds.model.request.UPIReqModel;
 import in.codifi.funds.model.request.VerifyPaymentReqModel;
@@ -102,5 +103,14 @@ public interface PaymentServiceSpec {
 	 * @return
 	 */
 	RestResponse<GenericResponse> getHSToken(ClinetInfoModel info);
+
+	/**
+	 * method to back office payin
+	 * 
+	 * @author SowmiyaThangaraj
+	 * @param reqModel
+	 * @return
+	 */
+	RestResponse<GenericResponse> boPayIn(BOPayinReqModel reqModel);
 
 }

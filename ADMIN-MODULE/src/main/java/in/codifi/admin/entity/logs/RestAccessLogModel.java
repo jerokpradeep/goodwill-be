@@ -1,4 +1,4 @@
-package in.codifi.position.entity.logs;
+package in.codifi.admin.entity.logs;
 
 import java.sql.Timestamp;
 

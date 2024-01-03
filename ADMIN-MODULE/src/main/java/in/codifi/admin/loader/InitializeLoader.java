@@ -22,10 +22,10 @@ public class InitializeLoader extends HttpServlet {
 	public void init(@Observes StartupEvent ev) throws ServletException {
 
 		adminService.checkAccessLogTable();
-		adminService.checkRestAccessLogTable();
+		adminService.check24RestAccessLogTables();
 		Log.info("tables are created successfully");
-		cacheService.loadTokenForPosition();
-		cacheService.loadTokenForHoldings();
+//		cacheService.loadTokenForPosition();
+//		cacheService.loadTokenForHoldings();
 
 	}
 

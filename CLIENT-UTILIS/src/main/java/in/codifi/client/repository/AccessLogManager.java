@@ -1,7 +1,11 @@
 package in.codifi.client.repository;
 
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -231,6 +235,153 @@ public class AccessLogManager {
 				}
 			}
 		});
+	}
+	
+
+	/**
+	 * method to insert access log
+	 * 
+	 * @author SowmiyaThangaraj
+	 * @param accLogModel
+	 */
+	public void insert24RestAccessLog(RestAccessLogModel accLogModel) {
+		Date inTimeDate;
+		if (accLogModel.getInTime() != null) {
+			inTimeDate = new Date(accLogModel.getInTime().getTime());
+		} else {
+			inTimeDate = new Date();
+		}
+		String date = new SimpleDateFormat("ddMMYYYY").format(inTimeDate);
+		String hour = new SimpleDateFormat("HH").format(inTimeDate);
+		String tableName = "tbl_" + date + "_rest_access_log_" + hour;
+		accLogModel.setTableName(tableName);
+
+		List<RestAccessLogModel> cacheAccessLogModels = new ArrayList<>(
+				AccessLogCache.getInstance().getBatchRestAccessModel());
+		if (cacheAccessLogModels.size() > 0) {
+			if (cacheAccessLogModels.get(0).getTableName().equalsIgnoreCase(tableName)) {
+				AccessLogCache.getInstance().getBatchRestAccessModel().add(accLogModel);
+			} else {
+				AccessLogCache.getInstance().getBatchRestAccessModel().clear();
+				AccessLogCache.getInstance().setBatchRestAccessModel(new ArrayList<>());
+				insertBatch24RestAccessLog(cacheAccessLogModels);
+				AccessLogCache.getInstance().getBatchRestAccessModel().add(accLogModel);
+			}
+		} else {
+			AccessLogCache.getInstance().getBatchRestAccessModel().add(accLogModel);
+		}
+
+		if (AccessLogCache.getInstance().getBatchRestAccessModel().size() >= 0) {
+			List<RestAccessLogModel> accessLogModels = new ArrayList<>(
+					AccessLogCache.getInstance().getBatchRestAccessModel());
+			AccessLogCache.getInstance().getBatchRestAccessModel().clear();
+			AccessLogCache.getInstance().setBatchRestAccessModel(new ArrayList<>());
+			insertBatch24RestAccessLog(accessLogModels);
+		}
+	}
+
+	/**
+	 * method to insert 24 rest access logs into the table
+	 * 
+	 * @author SowmiyaThangaraj
+	 * @param cacheAccessLogModels
+	 */
+	private void insertBatch24RestAccessLog(List<RestAccessLogModel> cacheAccessLogModels) {
+		ExecutorService pool = Executors.newSingleThreadExecutor();
+		pool.execute(new Runnable() {
+			PreparedStatement statement = null;
+			Connection connection = null;
+
+			@Override
+			public void run() {
+				try {
+					connection = dataSource.getConnection();
+					// Check if the table exists, create it if not
+					if (!doesTableExist(connection, cacheAccessLogModels.get(0).getTableName())) {
+						createRestTable(connection, cacheAccessLogModels.get(0).getTableName());
+					}
+					if (cacheAccessLogModels != null && cacheAccessLogModels.size() > 0) {
+						String insertQuery = "INSERT INTO " + cacheAccessLogModels.get(0).getTableName()
+								+ "(user_id, url, in_time, out_time, total_time, module,"
+								+ " method, req_body, res_body) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+						statement = connection.prepareStatement(insertQuery);
+						for (RestAccessLogModel accLogModel : cacheAccessLogModels) {
+							int paramPos = 1;
+							statement.setString(paramPos++, accLogModel.getUserId());
+							statement.setString(paramPos++, accLogModel.getUrl());
+							statement.setTimestamp(paramPos++, accLogModel.getInTime());
+							statement.setTimestamp(paramPos++, accLogModel.getOutTime());
+							statement.setString(paramPos++, accLogModel.getTotalTime());
+							statement.setString(paramPos++, accLogModel.getModule());
+							statement.setString(paramPos++, accLogModel.getMethod());
+							statement.setString(paramPos++, accLogModel.getReqBody());
+							String respBody = "";
+							int maxLength = 8192;
+							if (StringUtil.isNotNullOrEmpty(accLogModel.getResBody())
+									&& accLogModel.getResBody().length() > maxLength) {
+								respBody = accLogModel.getResBody().substring(0, maxLength);
+							} else {
+								respBody = accLogModel.getResBody();
+							}
+							statement.setString(paramPos++, respBody);
+							statement.addBatch();
+						}
+						statement.executeBatch();
+					}
+					statement.close();
+					connection.close();
+				} catch (Exception e) {
+					Log.error("Client - insertRest24AccessLog -" + e);
+				} finally {
+					try {
+						if (statement != null) {
+							statement.close();
+						}
+						if (connection != null) {
+							connection.close();
+						}
+					} catch (Exception e) {
+						Log.error("Client - insertRest24AccessLog -" + e);
+					}
+				}
+			}
+
+		});
+	}
+
+	/**
+	 * method to create rest table
+	 * 
+	 * @author SowmiyaThangaraj
+	 * @param connection
+	 * @param tableName
+	 */
+	private void createRestTable(Connection connection, String tableName) throws SQLException {
+		// Your table creation SQL statement
+		String createTableQuery = "CREATE TABLE " + tableName + " (" + "id INT PRIMARY KEY AUTO_INCREMENT, "
+				+ "user_id VARCHAR(20), " + "url VARCHAR(50), " + "in_time TIMESTAMP, " + "out_time TIMESTAMP, "
+				+ "total_time VARCHAR(50), " + "module VARCHAR(50), " + "method VARCHAR(50), " + "req_body TEXT, "
+				+ "res_body TEXT " + ")";
+
+		try (Statement statement = connection.createStatement()) {
+			statement.executeUpdate(createTableQuery);
+		}
+	}
+
+	/**
+	 * method to check table if exit or not
+	 * 
+	 * @author SowmiyaThangaraj
+	 * @param connection
+	 * @param tableName
+	 * @return
+	 */
+	private boolean doesTableExist(Connection connection, String tableName) throws SQLException {
+		DatabaseMetaData metadata = connection.getMetaData();
+		try (ResultSet resultSet = metadata.getTables(null, null, tableName, null)) {
+			return resultSet.next();
+		}
 	}
 
 //	public void insertAccessLog(AccessLogModel accLogModel) {

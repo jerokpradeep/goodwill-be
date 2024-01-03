@@ -111,7 +111,7 @@ public class FundsRestService {
 				if (StringUtil.isNotNullOrEmpty(output)) {
 					response = mapper.readValue(output, RestLimitsResp.class);
 					if (StringUtil.isNotNullOrEmpty(response.getEmsg()))
-						System.out.println("Error Connection in Limits api. Rsponse code -" + response.getEmsg());
+						System.out.println("Error Connection in Limits api. Response code -" + response.getEmsg());
 				}
 			}
 		} catch (Exception e) {
@@ -136,7 +136,7 @@ public class FundsRestService {
 			@Override
 			public void run() {
 				try {
-					accessLogManager.insertRestAccessLog(accessLogModel);
+					accessLogManager.insert24RestAccessLog(accessLogModel);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}

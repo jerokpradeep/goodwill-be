@@ -38,6 +38,8 @@ public class AppConstants {
 	public static final String NO_DATA = "No Data";
 	public static final String TOKEN_NOT_EXISTS = "The token does not exists";
 	public static final String INVALID_USER_SESSION = "Invalid user session";
+	public static final String INVALID_COMBINATION = "Invalid order combination";
+	public static final String CANNOT_SELL_AMO = "Cannot place Sell CNC AMO Order.";
 	public static final String GUEST_USER_ERROR = "Guest User";
 
 	public static final String REST_SUCCESS_STATUS = "success";
@@ -80,6 +82,7 @@ public class AppConstants {
 	public static final String REST_STATUS_OK = "Ok";
 	public static final String REST_NO_DATA = "no data";
 	public static final String NO_RECORD_FOUND = "No records are found";
+	public static final String X_FORWARDED_FOR = "X-Forwarded-For";
 
 	public static final String MODULE_ORDERS = "Orders";
 	public static final String CANNOT_SELL_CNC = "EDIS Authorization Required.";

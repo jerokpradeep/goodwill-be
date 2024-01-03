@@ -7,6 +7,7 @@ import org.jboss.resteasy.reactive.RestResponse;
 
 import in.codifi.cache.model.ClinetInfoModel;
 import in.codifi.funds.controller.spec.PaymentControllerSpec;
+import in.codifi.funds.model.request.BOPayinReqModel;
 import in.codifi.funds.model.request.PaymentReqModel;
 import in.codifi.funds.model.request.UPIReqModel;
 import in.codifi.funds.model.request.VerifyPaymentReqModel;
@@ -218,6 +219,23 @@ public class PaymentController implements PaymentControllerSpec {
 			return prepareResponse.prepareFailedResponse(AppConstants.GUEST_USER_ERROR);
 		}
 		return paymentService.getHSToken(info);
+	}
+
+	/**
+	 * method to back office pay in
+	 * 
+	 * @author SowmiyaThangaraj
+	 * @return
+	 */
+	public RestResponse<GenericResponse> boPayIn(BOPayinReqModel reqModel) {
+		ClinetInfoModel info = appUtil.getClientInfo();
+		if (info == null || StringUtil.isNullOrEmpty(info.getUserId())) {
+			Log.error("Client info is null");
+			return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+		} else if (StringUtil.isNullOrEmpty(info.getUcc())) {
+			return prepareResponse.prepareFailedResponse(AppConstants.GUEST_USER_ERROR);
+		}
+		return paymentService.boPayIn(reqModel);
 	}
 
 }

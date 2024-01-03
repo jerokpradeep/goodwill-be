@@ -16,7 +16,7 @@ public class LogsController implements LogsControllerSpec {
 
 	@Inject
 	LogsServiceSpec logsServiceSpec;
-	
+
 	/**
 	 * Method to get error logs in database
 	 * 
@@ -51,7 +51,37 @@ public class LogsController implements LogsControllerSpec {
 	public RestResponse<GenericResponse> getAccessLogTablewithPageable(LogsRequestModel reqModel) {
 		return logsServiceSpec.getAccessLogTablewithPageable(reqModel);
 	}
-	
-	
 
+	/*
+	 * method to check the rest access log table if exist or not
+	 * 
+	 * @author SOWMIYA
+	 * 
+	 * @return
+	 */
+	@Override
+	public RestResponse<GenericResponse> check24RestAccessLogTables() {
+		return logsServiceSpec.check24RestAccessLogTables();
+	}
+
+	/**
+	 * method to check 24 access log table if not exits means to create
+	 * 
+	 * @author SowmiyaThangaraj
+	 * @return
+	 */
+	public RestResponse<GenericResponse> checkAccessLogTable() {
+		return logsServiceSpec.checkAccessLogTable();
+	}
+
+	/**
+	 * method get rest access logs
+	 * 
+	 * @author SowmiyaThangaraj
+	 * @param reqModel
+	 * @return
+	 */
+	public RestResponse<GenericResponse> getRestAccessLogs(LogsRequestModel reqModel) {
+		return logsServiceSpec.getRestAccessLogs(reqModel);
+	}
 }

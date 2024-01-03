@@ -2,242 +2,143 @@ package in.codifi.admin.repository;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.sql.DataSource;
 
-import org.jboss.resteasy.reactive.RestResponse;
-import org.json.simple.JSONObject;
-
-import in.codifi.admin.model.response.GenericResponse;
-import in.codifi.admin.model.response.UsersLoggedInModel;
+import in.codifi.admin.cache.AccessLogCache;
+import in.codifi.admin.entity.logs.AccessLogModel;
+import in.codifi.admin.utility.StringUtil;
 import io.quarkus.logging.Log;
 
 @ApplicationScoped
 public class AccessLogManager {
-
 	@Named("logs")
 	@Inject
 	DataSource dataSource;
 
 	/**
-	 * method to get count by vendor
+	 * method to insert access log
 	 * 
-	 * @author LOKESH
-	 * @param vendor
-	 * @return
+	 * @author SowmiyaThangaraj
+	 * @param accLogModel
 	 */
-	@SuppressWarnings("unchecked")
-	public List<JSONObject> getCountByVendor(List<String> vendors) {
-		Connection connection = null;
-		PreparedStatement statement = null;
-		ResultSet resultSet = null;
-		List<JSONObject> ssoModel = new ArrayList<>();
-		try {
-			connection = dataSource.getConnection();
-
-			for (String vendor : vendors) {
-				String selectQuery = "select vendor,count(user_id)as userCount from tbl_user_loggedin_report where vendor = ?"
-						+ "GROUP BY vendor";
-				statement = connection.prepareStatement(selectQuery);
-				statement.setString(1, vendor);
-				resultSet = statement.executeQuery();
-				if (resultSet != null) {
-					while (resultSet.next()) {
-						JSONObject json = new JSONObject();
-						json.put("vendor", resultSet.getString("vendor"));
-						json.put("userCount", resultSet.getInt("userCount"));
-						ssoModel.add(json);
-					}
-				}
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-			Log.error("getCountBySource", e);
-
-		} finally {
-			try {
-				if (resultSet != null) {
-					resultSet.close();
-				}
-				if (statement != null) {
-					statement.close();
-				}
-				if (connection != null) {
-					connection.close();
-				}
-			} catch (Exception e) {
-				Log.error("getCountBySource -" + e);
-			}
+	public void insertAccessLog(AccessLogModel accLogModel) {
+		Date inTimeDate;
+		if (accLogModel.getInTime() != null) {
+			inTimeDate = new Date(accLogModel.getInTime().getTime());
+		} else {
+			inTimeDate = new Date();
 		}
-		return ssoModel;
+		String date = new SimpleDateFormat("ddMMYYYY").format(inTimeDate);
+		String hour = new SimpleDateFormat("HH").format(inTimeDate);
+		String tableName = "tbl_" + date + "_access_log_" + hour;
+		accLogModel.setTableName(tableName);
+
+		List<AccessLogModel> cacheAccessLogModels = new ArrayList<>(AccessLogCache.getInstance().getBatchAccessModel());
+		if (cacheAccessLogModels.size() > 0) {
+			if (cacheAccessLogModels.get(0).getTableName().equalsIgnoreCase(tableName)) {
+				AccessLogCache.getInstance().getBatchAccessModel().add(accLogModel);
+			} else {
+				AccessLogCache.getInstance().getBatchAccessModel().clear();
+				AccessLogCache.getInstance().setBatchAccessModel(new ArrayList<>());
+				insertBatchAccessLog(cacheAccessLogModels);
+				AccessLogCache.getInstance().getBatchAccessModel().add(accLogModel);
+			}
+		} else {
+			AccessLogCache.getInstance().getBatchAccessModel().add(accLogModel);
+		}
+
+		if (AccessLogCache.getInstance().getBatchAccessModel().size() >= 25) {
+			List<AccessLogModel> accessLogModels = new ArrayList<>(AccessLogCache.getInstance().getBatchAccessModel());
+			AccessLogCache.getInstance().getBatchAccessModel().clear();
+			AccessLogCache.getInstance().setBatchAccessModel(new ArrayList<>());
+			insertBatchAccessLog(accessLogModels);
+		}
 	}
 
 	/**
-	 * method to get count by source
+	 * Method to insert batch access log
 	 * 
-	 * @author LOKESH
-	 * @param source
-	 * @return
+	 * @author Dinesh Kumar
+	 * @param batchLogs
 	 */
-	public UsersLoggedInModel getCountBySource() {
+	public void insertBatchAccessLog(List<AccessLogModel> batchLogs) {
 
-		Connection connection = null;
-		PreparedStatement statement = null;
-		ResultSet resultSet = null;
-		UsersLoggedInModel respModel = new UsersLoggedInModel();
-		String source = " ('WEB','MOB','API') ";
-		try {
-			connection = dataSource.getConnection();
+		ExecutorService pool = Executors.newSingleThreadExecutor();
+		pool.execute(new Runnable() {
+			PreparedStatement statement = null;
+			Connection connection = null;
 
-			String selectQuery = " select source,count(user_id)as userCount from tbl_user_loggedin_report where source in "
-					+ source + " GROUP BY source";
-			statement = connection.prepareStatement(selectQuery);
-//				statement.setString(1, source);
-			resultSet = statement.executeQuery();
-			if (resultSet != null) {
-				while (resultSet.next()) {
-					String sourceValue = resultSet.getString("source");
-					int userCount = resultSet.getInt("userCount");
-					if (sourceValue.equalsIgnoreCase("WEB")) {
-						respModel.setWeb(userCount);
+			@Override
+			public void run() {
+				try {
+					connection = dataSource.getConnection();
+					if (batchLogs != null && batchLogs.size() > 0) {
+						String insertQuery = "INSERT INTO " + batchLogs.get(0).getTableName() + " "
+								+ " (user_id, ucc, req_id, source, vendor, in_time, out_time, lag_time,  module, method, req_body,"
+								+ " res_body, device_ip, user_agent, domain, content_type, session, uri) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+						statement = connection.prepareStatement(insertQuery);
+						for (AccessLogModel accLogModel : batchLogs) {
+							int paramPos = 1;
+							statement.setString(paramPos++, accLogModel.getUserId());
+							statement.setString(paramPos++, accLogModel.getUcc());
+							statement.setString(paramPos++, accLogModel.getReqId());
+							statement.setString(paramPos++, accLogModel.getSource());
+							statement.setString(paramPos++, accLogModel.getVendor());
+							statement.setTimestamp(paramPos++, accLogModel.getInTime());
+							statement.setTimestamp(paramPos++, accLogModel.getOutTime());
+							statement.setLong(paramPos++, accLogModel.getLagTime());
+							statement.setString(paramPos++, accLogModel.getModule());
+							statement.setString(paramPos++, accLogModel.getMethod());
+							statement.setString(paramPos++, accLogModel.getReqBody());
+							String respBody = "";
+							int maxLength = 8192;
+							if (StringUtil.isNotNullOrEmpty(accLogModel.getResBody())
+									&& accLogModel.getResBody().length() > maxLength) {
+								respBody = accLogModel.getResBody().substring(0, maxLength);
+							} else {
+								respBody = accLogModel.getResBody();
+							}
+							statement.setString(paramPos++, respBody);
+							statement.setString(paramPos++, accLogModel.getDeviceIp());
+							statement.setString(paramPos++, accLogModel.getUserAgent());
+							statement.setString(paramPos++, accLogModel.getDomain());
+							statement.setString(paramPos++, accLogModel.getContentType());
+							statement.setString(paramPos++, accLogModel.getSession());
+							statement.setString(paramPos++, accLogModel.getUri());
+							statement.addBatch();
+						}
+						statement.executeBatch();
 					}
-					if (sourceValue.equalsIgnoreCase("MOB")) {
-						respModel.setMob(userCount);
+					statement.close();
+					connection.close();
+				} catch (Exception e) {
+					Log.error("Auth - insertAccessLog -" + e);
+				} finally {
+					try {
+						if (statement != null) {
+							statement.close();
+						}
+						if (connection != null) {
+							connection.close();
+						}
+					} catch (Exception e) {
+						Log.error(" Auth - insertAccessLog -" + e);
 					}
-					if (sourceValue.equalsIgnoreCase("API")) {
-						respModel.setApi(userCount);
-					}
 				}
 			}
-		} catch (Exception e) {
-			e.printStackTrace();
-			Log.error("getCountBySource", e);
-
-		} finally {
-			try {
-				if (statement != null) {
-					statement.close();
-				}
-				if (connection != null) {
-					connection.close();
-				}
-			} catch (Exception e) {
-				Log.error("getCountBySource -" + e);
-			}
-		}
-		return respModel;
+		});
 	}
 
-	/**
-	 * method to find distinct vendors
-	 * 
-	 * @author LOKESH
-	 * @return
-	 */
-	public List<String> findDistinctVendors() {
 
-		Connection connection = null;
-		PreparedStatement statement = null;
-		ResultSet resultSet = null;
-		List<String> vendorList = new ArrayList<>();
-		try {
-			connection = dataSource.getConnection();
-			String selectQuery = "SELECT DISTINCT vendor FROM tbl_user_loggedin_report WHERE vendor IS NOT NULL";
-			statement = connection.prepareStatement(selectQuery);
-			resultSet = statement.executeQuery();
-			if (resultSet != null) {
-				while (resultSet.next()) {
-					String vendor = resultSet.getString("vendor");
-					vendorList.add(vendor);
-				}
-			}
-
-		} catch (Exception e) {
-			e.printStackTrace();
-			Log.error("getCountBySource", e);
-
-		} finally {
-			try {
-				if (resultSet != null) {
-					resultSet.close();
-				}
-				if (statement != null) {
-					statement.close();
-				}
-				if (connection != null) {
-					connection.close();
-				}
-			} catch (Exception e) {
-				Log.error("getCountBySource -" + e);
-			}
-		}
-		return vendorList;
-	}
-
-	@SuppressWarnings("unused")
-	public RestResponse<GenericResponse> truncateUserLoggedInDetails() {
-		Connection connection = null;
-		PreparedStatement statement = null;
-
-		try {
-			connection = dataSource.getConnection();
-			String truncateQuery = "TRUNCATE TABLE tbl_user_loggedin_report";
-			statement = connection.prepareStatement(truncateQuery);
-			int rowsAffected = statement.executeUpdate();
-		} catch (Exception e) {
-			e.printStackTrace();
-			Log.error("getCountBySource", e);
-		}
-		return null;
-	}
-
-	/**
-	 * method to get Total users logged in details
-	 * 
-	 * @author LOKESH
-	 */
-	public int getTotalUserLoggedInDetails() {
-		Connection connection = null;
-		PreparedStatement statement = null;
-		ResultSet resultSet = null;
-		int userCount = 0;
-		try {
-			connection = dataSource.getConnection();
-			String selectQuery = "select count(DISTINCT(user_id)) as userCount from tbl_user_loggedin_report";
-			statement = connection.prepareStatement(selectQuery);
-			resultSet = statement.executeQuery();
-			if (resultSet != null) {
-				while (resultSet.next()) {
-					userCount = resultSet.getInt("userCount");
-				}
-			}
-			connection.close();
-		} catch (Exception e) {
-			e.printStackTrace();
-			Log.error("getCountBySource", e);
-
-		} finally {
-			try {
-				if (resultSet != null) {
-					resultSet.close();
-				}
-				if (statement != null) {
-					statement.close();
-				}
-				if (connection != null) {
-					connection.close();
-				}
-			} catch (Exception e) {
-				Log.error("getCountBySource -" + e);
-			}
-		}
-		return userCount;
-	}
-
+	
 }

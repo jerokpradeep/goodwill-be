@@ -546,6 +546,7 @@ public class BasketOrderService implements IBasketOrderService {
 	@Override
 	public RestResponse<List<GenericResponse>> excuteBasketOrder(ExecuteBasketOrderReq executeBasketOrderReq,
 			ClinetInfoModel info) {
+		String orderResp = "";
 		try {
 			if (executeBasketOrderReq.getBasketId() < 1 || executeBasketOrderReq.getScrips().size() <= 0)
 				return prepareResponse.prepareFailedResponseForList(AppConstants.INVALID_PARAMETER);
@@ -570,15 +571,15 @@ public class BasketOrderService implements IBasketOrderService {
 			List<GenericResponse> res = internalRestService.executeOrders(request, token);
 			try {
 				ObjectMapper mapper = new ObjectMapper();
-				String orderResp = mapper.writeValueAsString(res);
+				orderResp = mapper.writeValueAsString(res);
 				Log.info("executeOrderResponse" + orderResp);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
 
 			if (res != null) {
-				Log.info("updateExecutionStatus" + res);
-				long isUpdate = basketOrderRepository.updateExecutionStatus("1", info.getUserId(), info.getUserId(),
+				Log.info("updateExecutionStatus" + orderResp);
+				int isUpdate = basketOrderEntityManager.updateExecuteOrdersIntoDB(info.getUserId(),
 						executeBasketOrderReq.getBasketId());
 				Log.info("isUpdate" + isUpdate);
 				if (isUpdate > 0)

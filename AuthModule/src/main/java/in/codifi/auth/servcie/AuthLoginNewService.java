@@ -167,13 +167,15 @@ public class AuthLoginNewService implements AuthLoginNewServiceSpec {
 			if (userInfo != null && userInfo.size() > 0) {
 				String request = prepareQuickAuthRequest(authmodel, userInfo);
 				if (request != null) {
+//					quickAuthLoginForWeb(authmodel, userInfo);
 					quickAuthRespModel = kambalaRestServices.quickAuthBypassLogin(request, authmodel.getSource(),
 							authmodel.getUserId());
 					if (quickAuthRespModel.getStat().equalsIgnoreCase(AppConstants.REST_STATUS_OK)) {
 						if (StringUtil.isNotNullOrEmpty(quickAuthRespModel.getSUserToken())) {
 							updateUserCache(quickAuthRespModel, authmodel.getUserId());
 							GetTokenResponse kcTokenResp = kcTokenRest.getUserToken(authmodel, 0);
-
+//							quickAuthLoginForWeb(authmodel, userInfo);
+//							quickAuthLoginForMob(authmodel, userInfo);
 							if (kcTokenResp != null) {
 
 								/** Return if failed to login on key clock **/
@@ -682,6 +684,87 @@ public class AuthLoginNewService implements AuthLoginNewServiceSpec {
 		}
 		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
 
+	}
+
+	/**
+	 * method to quick auth login for web
+	 * 
+	 * @author SowmiyaThangaraj
+	 * 
+	 * @return
+	 */
+	public RestResponse<GenericResponse> quickAuthLoginForWeb(AuthReq authmodel, List<GetUserInfoResp> userInfo) {
+		QuickAuthRespModel quickAuthRespModel = new QuickAuthRespModel();
+		try {
+			String request = null;
+			ObjectMapper mapper = new ObjectMapper();
+			try {
+				QuickAuthLoginReqModel reqModel = new QuickAuthLoginReqModel();
+				reqModel.setApkVersion("1.0.0");
+				reqModel.setFactor2(authmodel.getOtp());
+				reqModel.setImei("0.0.0");
+				reqModel.setUId(userInfo.get(0).getUsername().toUpperCase());
+				reqModel.setSource("WEB");
+				String appKey = appUtils
+						.encryptWithSHA256(userInfo.get(0).getUsername().toUpperCase() + "|" + props.getWebAppKey());
+				reqModel.setAppKey(appKey);
+				reqModel.setVendorCode(props.getWebVendorCode());
+				String password = HazelcastConfig.getInstance().getPassword().get(authmodel.getUserId());
+				String pwd = appUtils.encryptWithSHA256(password);
+				reqModel.setPwd(pwd);
+				String reqText = mapper.writeValueAsString(reqModel);
+				request = AppConstants.JDATA + reqText;
+				quickAuthRespModel = kambalaRestServices.quickAuthBypassLoginforWeb(request, authmodel.getSource(),
+						authmodel.getUserId());
+
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
+	}
+
+	/**
+	 * method to quick auth login for mob
+	 * 
+	 * @author SowmiyaThangaraj
+	 * @param userInfo
+	 * @param authmodel
+	 * @return
+	 */
+	public RestResponse<GenericResponse> quickAuthLoginForMob(AuthReq authmodel, List<GetUserInfoResp> userInfo) {
+		QuickAuthRespModel quickAuthRespModel = new QuickAuthRespModel();
+		try {
+			String request = null;
+			ObjectMapper mapper = new ObjectMapper();
+			try {
+				QuickAuthLoginReqModel reqModel = new QuickAuthLoginReqModel();
+				reqModel.setApkVersion("1.0.0");
+				reqModel.setFactor2(authmodel.getOtp());
+				reqModel.setImei("0.0.0");
+				reqModel.setUId(userInfo.get(0).getUsername().toUpperCase());
+				reqModel.setSource("MOB");
+				String appKey = appUtils
+						.encryptWithSHA256(userInfo.get(0).getUsername().toUpperCase() + "|" + props.getMobAppKey());
+				reqModel.setAppKey(appKey);
+				reqModel.setVendorCode(props.getMobVendorCode());
+				String password = HazelcastConfig.getInstance().getPassword().get(authmodel.getUserId());
+				String pwd = appUtils.encryptWithSHA256(password);
+				reqModel.setPwd(pwd);
+				String reqText = mapper.writeValueAsString(reqModel);
+				request = AppConstants.JDATA + reqText;
+				quickAuthRespModel = kambalaRestServices.quickAuthBypassLoginForMob(request, authmodel.getSource(),
+						authmodel.getUserId());
+
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return prepareResponse.prepareFailedResponse(AppConstants.FAILED_STATUS);
 	}
 
 }

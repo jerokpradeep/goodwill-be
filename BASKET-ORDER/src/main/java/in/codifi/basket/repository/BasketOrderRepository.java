@@ -83,7 +83,7 @@ public interface BasketOrderRepository extends JpaRepository<BasketNameEntity, L
 	 * @return
 	 */
 	@Modifying
-	@Query(value = " update TBL_BASKET_ORDER set IS_EXECUTED = :exeStatus, UPDATED_BY = :updated_by WHERE USER_ID = :user_id and BASKET_ID = :basketId ")
+	@Query(value = " update TBL_BASKET_ORDER set IS_EXECUTED = 1, UPDATED_BY = :updated_by WHERE USER_ID = :user_id and BASKET_ID = :basketId ")
 	int updateExecutionStatus(@Param("exeStatus") String exeStatus, @Param("updated_by") String updatedBy,
 			@Param("user_id") String userId, @Param("basketId") long basketId);
 
